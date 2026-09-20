@@ -125,15 +125,6 @@ export function LabPage(): React.ReactElement {
   );
 }
 
-export function CodingPage(): React.ReactElement {
-  return (
-    <div className="page">
-      <h1>代码练习</h1>
-      <p className="page-lead">（P11 开发中）编程题编辑器与本地判题将在此开放。</p>
-    </div>
-  );
-}
-
 export function BankPage(): React.ReactElement {
   return (
     <div className="page">

@@ -28,6 +28,8 @@
 
 - P10：错题本页（错因筛选/重练/标记掌握）、学习统计页（完成度/正确率/连续天数/章节进度条/掌握分布/近 30 天趋势柱图）、全局搜索页（章节/算法/题目，搜"指针"命中预期）、页面冒烟测试（9 个路由 + 答题交互）。
 
+- P11：判题比对规范化（CRLF/LF、行尾空白、末尾换行；中间空行/大小写/行内空格严格）、判题状态机（AC/WA/CE/RE/TLE，WA 展示 输入/Expected/Actual/差异行）、本地 Runner（编译器探测 gcc/clang/cl + Windows 常见路径、spawn 数组 argv 防注入、独立临时目录、超时 + taskkill /T /F 进程树终止、1MB 输出限制、用后清理）、10 道编程题（题面/模板/用例/参考答案/判题 harness）、CodeMirror 编辑器 CodingPage（无编译器降级提示）、SECURITY.md。
+
 ### Fixed
 - bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
 - deletePure 情形三"前驱即左孩子"分支挂接错误。
