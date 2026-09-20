@@ -4,7 +4,6 @@ import { AppStoreProvider } from './ui/AppStore';
 import { ChapterPage, CourseListPage } from './pages/CoursePage';
 import {
   AlgorithmsPage,
-  BankPage,
   CodingPage,
   HomePage,
   SearchPage,
@@ -14,6 +13,7 @@ import {
   WrongBookPage,
 } from './pages/Placeholder';
 import { LabPage } from './pages/LabPage';
+import { BankPage } from './pages/BankPage';
 
 export function App(): React.ReactElement {
   return (
