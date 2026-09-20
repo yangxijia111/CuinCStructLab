@@ -19,6 +19,9 @@
 - P5：ArrayView（index/value/写操作突出/容量标尺）、BarsView、ListView（节点双格/指针 chips/floating 行）、StackView、QueueView（环形格子+front/rear 游标）、StateRenderer 分发；Labs 注册表（7 个线性实验室，含 Ch0 指针内存演示、假溢出演示、括号匹配）；LabPage（结构选择/数据初始化/操作参数/动画执行）；行号审计测试与三者同步性集成测试。
 - 行号系统重构：全部数据结构模块改用 buildLineMap（按 C 代码文本运行时定位行号），修复多处硬编码行号偏移导致的"动画与代码不同步"。
 
+- P6：TreeView（中序 x/深度 y 布局、遍历序号、freed 虚化、层序队列面板）、HeapView（树+数组双视图）、GraphView（SVG 拖动节点、visited/current/next 三态、frontier 面板、有向箭头）；4 个进阶实验室（树遍历含调用栈、BST 删除三情形、堆三操作、图 DFS/BFS/增删）。
+- P7：SortingLab（单算法动画 + 查找模式）、Compare Mode（≤3 算法并排、共享步进、到尾停留显示最终计数）、排序/查找实验室集成测试。
+
 ### Fixed
 - bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
 - deletePure 情形三"前驱即左孩子"分支挂接错误。

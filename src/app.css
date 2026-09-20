@@ -1028,3 +1028,508 @@ button {
   width: fit-content;
   padding: 0 6px;
 }
+
+/* ============ 树 / 堆 / 图渲染器 ============ */
+.tree-view,
+.heap-view,
+.graph-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.tree-edge {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.tree-edge.hl {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.tree-node {
+  fill: var(--bg-panel-2);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.tree-node.hl {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.tree-node.visited {
+  stroke: var(--sorted);
+  stroke-width: 2.5;
+  fill: rgba(88, 201, 137, 0.12);
+}
+
+.tree-node.freed {
+  opacity: 0.35;
+  stroke-dasharray: 4 3;
+}
+
+.tree-node-text {
+  fill: var(--text);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+
+.tree-visit-no {
+  fill: var(--sorted);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+.tree-visit-seq {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-panel-2);
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+.tree-visit-seq strong {
+  color: var(--accent);
+}
+
+.tree-frontier {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.heap-mode-badge {
+  font-size: 11px;
+  color: var(--pivot);
+  border: 1px solid var(--pivot);
+  border-radius: 4px;
+  padding: 1px 8px;
+}
+
+.heap-array-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.heap-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.heap-cell em {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--text-dim);
+}
+
+.heap-cell.hl {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.graph-svg {
+  max-width: 100%;
+  cursor: default;
+}
+
+.graph-edge {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.graph-edge.hl {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.graph-arrow {
+  fill: var(--border);
+}
+
+.graph-arrow.hl {
+  fill: var(--accent);
+}
+
+.graph-node {
+  fill: var(--bg-panel-2);
+  stroke: var(--border);
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.graph-node.hl {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.graph-node.visited {
+  fill: rgba(88, 201, 137, 0.18);
+  stroke: var(--sorted);
+}
+
+.graph-node.current {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 3.5;
+}
+
+.graph-node.next {
+  fill: rgba(230, 180, 80, 0.15);
+  stroke: var(--compare);
+  stroke-width: 3;
+}
+
+.graph-node-text {
+  fill: var(--text);
+  font-size: 13px;
+  font-family: var(--mono);
+  pointer-events: none;
+}
+
+.graph-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.graph-legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.graph-legend .lg::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: inline-block;
+}
+
+.graph-legend .lg.current::before {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.graph-legend .lg.next::before {
+  border-color: var(--compare);
+}
+
+.graph-legend .lg.visited::before {
+  border-color: var(--sorted);
+  background: rgba(88, 201, 137, 0.25);
+}
+
+.graph-frontier {
+  font-family: var(--mono);
+}
+
+.graph-frontier strong {
+  color: var(--accent);
+}
+
+/* ============ 实验室页 ============ */
+.lab-page {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 14px;
+  min-height: calc(100vh - 88px);
+}
+
+.lab-sidebar {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+}
+
+.lab-sidebar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.lab-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.lab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lab-item {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.lab-item:hover {
+  background: var(--bg-panel-2);
+  color: var(--text);
+}
+
+.lab-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.lab-init {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lab-init label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.lab-init input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 9px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.lab-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+.lab-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lab-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lab-op {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.lab-op .btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.lab-param {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.lab-param input {
+  width: 64px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.lab-message {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+.lab-canvas-preview {
+  min-height: 300px;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.renderer-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ============ 排序实验室 ============ */
+.sorting-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+.sort-controls {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.sort-data {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.sort-data input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 9px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  min-width: 200px;
+}
+
+.sort-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.sort-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 9px;
+  font-size: 12.5px;
+}
+
+.compare-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.compare-pick {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cmp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.cmp-chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cmp-note {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.compare-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cmp-track {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cmp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.cmp-meta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.cmp-done {
+  color: var(--ok);
+}

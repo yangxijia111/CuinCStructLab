@@ -47,13 +47,13 @@
 - **验收**：同步性集成测试（codeLine/variables/highlight 一致）；手工清单：`10 20 30` 插入 pos=1 value=15 → `10→15→20→30`。
 - **完成标准**：FR-VIZ-05/06/07、FR-LAB 线性部分达成。
 
-## P6 树/堆/图可视化 + Playground（二） ⬜
+## P6 树/堆/图可视化 + Playground（二） ✅
 - **目标**：TreeView/BSTView/HeapView/GraphView。
 - **功能**：遍历 + CallStack 同步、BST 删除三情形动画、堆上滤/下滤、图增删点边/拖动/DFS/BFS + 队列栈面板。
 - **验收**：遍历动画与测试序列一致；图交互（增删/拖动）事件测试。
 - **完成标准**：FR-VIZ-08/09 达成。
 
-## P7 排序可视化 + Compare Mode ⬜
+## P7 排序可视化 + Compare Mode ✅
 - **目标**：BarsView、排序动画、比较模式。
 - **功能**：柱状图（比较/交换/已排序/pivot/merge 区间 + 三计数）、Compare Mode（≤3 算法并排、共享节拍）。
 - **验收**：7 算法动画步进抽样断言；Compare Mode 三算法同步推进。

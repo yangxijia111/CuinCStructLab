@@ -5,6 +5,8 @@ import type { VisualState } from '../../core/types';
 import { ArrayView, BarsView } from './ArrayView';
 import { ListView } from './ListView';
 import { QueueView, StackView } from './LinearViews';
+import { HeapView, TreeView } from './TreeViews';
+import { GraphView } from './GraphView';
 
 export function StateRenderer({
   state,
@@ -29,9 +31,11 @@ export function StateRenderer({
     case 'queue':
       return <QueueView state={state} highlight={highlight} />;
     case 'tree':
+      return <TreeView state={state} highlight={highlight} />;
     case 'heap':
+      return <HeapView state={state} highlight={highlight} />;
     case 'graph':
-      return <div className="renderer-empty">该结构的可视化将在后续版本提供（P6）</div>;
+      return <GraphView state={state} highlight={highlight} />;
     default: {
       const never: never = state;
       void never;

@@ -7,13 +7,15 @@ import { useSearchParams } from 'react-router-dom';
 import type { Step, VisualState } from '../core/types';
 import { VisualizationShell } from '../visualization/VisualizationShell';
 import { LINEAR_LABS, opCode } from '../visualization/labs';
+import { ADVANCED_LABS } from '../visualization/labs-advanced';
+import { SortingLab } from '../visualization/sorting-lab';
 import type { LabDef, LabOpDef } from '../visualization/labs';
 import { StateRenderer } from '../visualization/renderers/StateRenderer';
 import { useAppStore } from '../ui/AppStore';
 
 /** 全部实验室（P6/P7 追加后在此合并） */
 function allLabs(): LabDef<VisualState>[] {
-  return LINEAR_LABS as unknown as LabDef<VisualState>[];
+  return [...LINEAR_LABS, ...ADVANCED_LABS] as unknown as LabDef<VisualState>[];
 }
 
 export function LabPage(): React.ReactElement {
@@ -64,6 +66,22 @@ export function LabPage(): React.ReactElement {
       setMessage(`执行出错：${err instanceof Error ? err.message : String(err)}`);
     }
   };
+
+  // 排序实验室有专用 UI（Compare Mode / 查找模式）
+  const isSorting = labId === 'sorting';
+  if (isSorting) {
+    return (
+      <div className="lab-page">
+        <aside className="lab-sidebar">
+          <h2>排序与查找</h2>
+          <p className="lab-hint">7 种排序 + 二分查找。Compare Mode 支持最多 3 个算法并排。</p>
+        </aside>
+        <div className="lab-main">
+          <SortingLab />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lab-page">
@@ -159,6 +177,19 @@ function chapterToLabId(chapter: string | null): string {
       return 'stack';
     case '6':
       return 'queue';
+    case '7':
+      return 'array';
+    case '8':
+      return 'tree';
+    case '9':
+      return 'bst';
+    case '10':
+      return 'heap';
+    case '11':
+      return 'graph';
+    case '12':
+    case '13':
+      return 'sorting';
     default:
       return 'list';
   }
