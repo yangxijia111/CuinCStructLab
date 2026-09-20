@@ -47,7 +47,28 @@ function hasNodeRuntime(): boolean {
 }
 
 /** 探测编译器（PATH + Windows 常见安装位置） */
+interface DesktopBridge {
+  isDesktop: true;
+  runnerDetect(customPath?: string): Promise<RunnerAvailability>;
+  runnerCompileAndRun(payload: {
+    compiler: CompilerInfo;
+    userCode: string;
+    harness: string;
+    cases: Array<{ stdin: string; expected: string }>;
+    timeLimitMs: number;
+  }): Promise<CompileRunOutcome>;
+}
+
+function getDesktopBridge(): DesktopBridge | null {
+  const bridge = (globalThis as { cclabBridge?: DesktopBridge }).cclabBridge;
+  return bridge !== undefined && bridge.isDesktop ? bridge : null;
+}
+
 export async function detectCompilers(customPath?: string): Promise<RunnerAvailability> {
+  const bridge = getDesktopBridge();
+  if (bridge !== null) {
+    return bridge.runnerDetect(customPath);
+  }
   if (!hasNodeRuntime()) {
     return {
       available: false,
@@ -231,6 +252,10 @@ export async function compileAndRun(
   cases: Array<{ stdin: string; expected: string }>,
   timeLimitMs = DEFAULT_CASE_TIMEOUT_MS,
 ): Promise<CompileRunOutcome> {
+  const bridge = getDesktopBridge();
+  if (bridge !== null) {
+    return bridge.runnerCompileAndRun({ compiler, userCode, harness, cases, timeLimitMs });
+  }
   if (!hasNodeRuntime()) {
     throw new Error('compileAndRun 仅在桌面（Node/Electron）环境可用');
   }

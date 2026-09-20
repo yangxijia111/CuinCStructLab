@@ -41,7 +41,10 @@ export function ChapterPage(): React.ReactElement {
   const chapterId = Number(id ?? '0');
   const chapter = useMemo(() => CHAPTERS.find((c) => c.id === chapterId), [chapterId]);
   const [activeSection, setActiveSection] = useState(0);
-  const { visitChapter, markChapterDone, progress } = useAppStore();
+  const { visitChapter, markChapterDone, progress, isFavorite, toggleFavorite, notes, saveNote } = useAppStore();
+  const [noteDraft, setNoteDraft] = useState('');
+  const fav = isFavorite('chapter', String(chapterId));
+  const noteKey = `chapter:${chapterId}`;
 
   useEffect(() => {
     if (chapter !== undefined) {
@@ -90,8 +93,45 @@ export function ChapterPage(): React.ReactElement {
         <header className="chapter-head">
           <h1>{chapter.title}</h1>
           <p>{chapter.subtitle}</p>
+          <button
+            type="button"
+            className={fav ? 'btn fav on' : 'btn fav'}
+            onClick={() => toggleFavorite('chapter', String(chapterId))}
+          >
+            {fav ? '★ 已收藏' : '☆ 收藏本章'}
+          </button>
         </header>
         {section !== undefined && <SectionView section={section} chapterId={chapter.id} />}
+        <section className="panel chapter-note">
+          <h3>学习笔记</h3>
+          <textarea
+            value={noteDraft}
+            placeholder={notes[noteKey] !== undefined ? '' : '记录你的理解、疑问或总结（自动保存到本地）…'}
+            onChange={(e) => setNoteDraft(e.target.value)}
+          />
+          <div className="note-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                saveNote('chapter', String(chapterId), noteDraft);
+              }}
+            >
+              保存笔记
+            </button>
+            {notes[noteKey] !== undefined && (
+              <button type="button" className="btn" onClick={() => setNoteDraft(notes[noteKey] ?? '')}>
+                载入已有笔记
+              </button>
+            )}
+            {noteDraft !== '' && (
+              <span className="empty-hint">{noteDraft.length} 字</span>
+            )}
+          </div>
+          {notes[noteKey] !== undefined && notes[noteKey] !== '' && (
+            <pre className="note-saved">{notes[noteKey]}</pre>
+          )}
+        </section>
         <footer className="chapter-foot-nav">
           <button
             type="button"

@@ -134,15 +134,6 @@ export function BankPage(): React.ReactElement {
   );
 }
 
-export function SettingsPage(): React.ReactElement {
-  return (
-    <div className="page">
-      <h1>设置</h1>
-      <p className="page-lead">（P12 开发中）主题、速度、数据导出等设置将在此开放。</p>
-    </div>
-  );
-}
-
 export function SearchPage(): React.ReactElement {
   return (
     <div className="page">

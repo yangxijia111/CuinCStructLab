@@ -2411,3 +2411,124 @@ button {
   color: var(--danger);
   font-size: 12.5px;
 }
+
+/* ============ 设置页 ============ */
+.settings-section {
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  max-width: 640px;
+}
+
+.settings-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+  font-size: 13.5px;
+  flex-wrap: wrap;
+}
+
+.setting-row > span:first-child {
+  flex: 1;
+  min-width: 200px;
+}
+
+.setting-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.btn.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.setting-ok {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.setting-input {
+  flex: 1;
+  min-width: 260px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.setting-danger-text {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin-top: 8px;
+}
+
+/* ============ 章节笔记/收藏 ============ */
+.btn.fav {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.btn.fav.on {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: rgba(230, 180, 80, 0.1);
+}
+
+.chapter-note {
+  margin-top: 14px;
+  padding: 14px 16px;
+}
+
+.chapter-note h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.chapter-note textarea {
+  width: 100%;
+  min-height: 90px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.note-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.note-saved {
+  margin-top: 10px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  font-family: inherit;
+}

@@ -49,6 +49,14 @@ export default tseslint.config(
     },
   },
 
+  // Electron 主进程（CJS，Node 环境）
+  {
+    files: ['electron/**/*.cjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+
   // JS 文件与构建配置（含本配置）禁用需要类型信息的规则
   {
     files: ['**/*.js', 'vite.config.ts'],

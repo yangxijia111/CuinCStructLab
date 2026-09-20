@@ -14,8 +14,10 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "electron:dev": "echo \"Electron 外壳为可选增强，见 docs/ARCHITECTURE.md §1.2（P12 提供）\"",
-    "electron:build": "echo \"Electron 外壳为可选增强，见 docs/ARCHITECTURE.md §1.2（P12 提供）\""
+    "electron:dev": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.cjs",
+    "electron:build": "echo \"Electron 外壳为可选增强，见 docs/ARCHITECTURE.md §1.2（P12 提供）\"",
+    "electron:start": "electron electron/main.cjs",
+    "electron:smoke": "electron electron/smoke.cjs"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
@@ -35,6 +37,8 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.1",
+    "cross-env": "^10.1.0",
+    "electron": "^44.4.3",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
@@ -45,5 +49,6 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
-  }
+  },
+  "main": "electron/main.cjs"
 }

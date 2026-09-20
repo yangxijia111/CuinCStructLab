@@ -77,7 +77,23 @@ export class MemoryBackend implements PersistenceBackend {
   }
 }
 
-/** 检测运行环境并返回默认后端（Electron 文件桥接由 P12 注入） */
+/** Electron 桌面版：主进程文件持久化（userData/cuincstructlab.db） */
+export class ElectronFileBackend implements PersistenceBackend {
+  async load(): Promise<Uint8Array | null> {
+    const bridge = (globalThis as { cclabBridge?: { dbLoad(): Promise<Uint8Array | null> } }).cclabBridge;
+    if (bridge === undefined) throw new Error('桌面桥不可用');
+    return bridge.dbLoad();
+  }
+
+  async save(data: Uint8Array): Promise<void> {
+    const bridge = (globalThis as { cclabBridge?: { dbSave(d: Uint8Array): Promise<void> } }).cclabBridge;
+    if (bridge === undefined) throw new Error('桌面桥不可用');
+    await bridge.dbSave(data);
+  }
+}
+
+/** 检测运行环境并返回默认后端 */
 export function defaultBackend(): PersistenceBackend {
-  return new IndexedDbBackend();
+  const bridge = (globalThis as { cclabBridge?: unknown }).cclabBridge;
+  return bridge === undefined ? new IndexedDbBackend() : new ElectronFileBackend();
 }
