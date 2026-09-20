@@ -1,0 +1,80 @@
+/* ============ 主题变量（UI_UX_SPEC §1，Dark 优先） ============ */
+:root {
+  --bg: #14161c;
+  --bg-panel: #1c1f27;
+  --bg-panel-2: #232733;
+  --border: #2e3342;
+  --text: #dfe3ec;
+  --text-dim: #9aa1b2;
+  --accent: #5b8cff;
+  --accent-soft: rgba(91, 140, 255, 0.16);
+  --compare: #e6b450;   /* 比较黄 */
+  --swap: #e0564f;      /* 交换红 */
+  --sorted: #58c989;    /* 已排序绿 */
+  --pivot: #a371f7;     /* pivot 紫 */
+  --danger: #e0564f;
+  --ok: #58c989;
+  --warn: #e6b450;
+  --radius: 8px;
+  --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+}
+
+[data-theme='light'] {
+  --bg: #f5f6fa;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #eef0f6;
+  --border: #d8dce6;
+  --text: #232733;
+  --text-dim: #5d6474;
+  --accent: #3563e9;
+  --accent-soft: rgba(53, 99, 233, 0.12);
+  --compare: #b98310;
+  --swap: #c7392f;
+  --sorted: #2c9e63;
+  --pivot: #7d4ee0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page {
+  padding: 32px;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.3;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+button {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
