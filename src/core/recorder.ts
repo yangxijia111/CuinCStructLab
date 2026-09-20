@@ -128,6 +128,28 @@ export interface RecordInput<S> {
   mutate?: (draft: S) => void;
 }
 
+/**
+ * 针对纯 JSON 结构的快速克隆（VisualState 无原型方法/循环引用）。
+ * 比 structuredClone 快数倍：排序 64 元素生成 4000 步的性能关键路径。
+ */
+export function fastClone<T>(value: T): T {
+  if (Array.isArray(value)) {
+    const arr = value as unknown as unknown[];
+    const out: unknown[] = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) out[i] = fastClone(arr[i]);
+    return out as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(record)) {
+      out[key] = fastClone(record[key]);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
 /** 递归冻结（含数组）；VisualState 无循环引用，深度安全 */
 function deepFreeze<T>(obj: T): T {
   if (obj !== null && typeof obj === 'object') {
@@ -164,7 +186,7 @@ export class StepRecorder<S extends VisualState> {
   /** 记录一步（可附带状态变更） */
   record(input: RecordInput<S>): void {
     const before = this.current;
-    const after = structuredClone(before) as S;
+    const after = fastClone(before);
     input.mutate?.(after);
     this.steps.push({
       id: this.steps.length,
@@ -191,7 +213,7 @@ export class StepRecorder<S extends VisualState> {
 
   /** 直接追加一条已构造好的步骤（id 自动重排；用于复用其他操作生成的步骤） */
   appendRaw(step: Step<S>): void {
-    const clone = structuredClone(step);
+    const clone = fastClone(step);
     clone.id = this.steps.length;
     // 当前状态推进到该步骤的终态
     this.current = clone.afterState;

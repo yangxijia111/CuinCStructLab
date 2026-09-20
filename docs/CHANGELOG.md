@@ -32,6 +32,8 @@
 
 - P12：设置页（主题/新手模式/编译器探测与自定义路径/JSON 导出/清空数据二次确认）、章节页收藏与学习笔记（本地保存）、Electron 桌面外壳（主进程文件持久化桥 + Runner IPC 桥 + preload 最小暴露，contextIsolation）、Electron 冒烟测试通过（electron:smoke 加载生产构建返回 0）、渲染层双后端自动切换（桌面 IndexedDB ↔ Electron 文件）。
 
+- P13（最终审计）：15 项审计清单专项测试（链表断链/空指针/循环队列 front-rear/BST 删除后中序严格递增/堆随机操作性质保持/有环图不重复访问/排序边界/二分命中/性能指标/动画代码同步）；性能优化（structuredClone → fastClone）；README.md 与 FINAL_REPORT.md；v1.0 标签。
+
 ### Fixed
 - bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
 - deletePure 情形三"前驱即左孩子"分支挂接错误。
