@@ -28,7 +28,7 @@
 - **测试**：hook 测试（renderHook + fake timers）+ 快照不变量。
 - **完成标准**：任一 Step[] 可驱动完整播放 UI。
 
-## P3 排序与查找算法 ⬜
+## P3 排序与查找算法 ✅
 - **目标**：7 种排序 + 2 种查找，纯函数版与步骤版。
 - **功能**：bubble/selection/insertion/shell/merge/quick/heap；linear/binary；计数器；Compare Mode 数据基础（同数据多算法 steps）。
 - **验收**：TEST_PLAN §2 排序/查找矩阵通过（8 组固定数据 + 随机）。

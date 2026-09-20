@@ -12,6 +12,8 @@
 
 - P2：usePlayback 播放控制器（快照回退/5 档速度/键盘快捷键/末尾自动暂停）、CodePanel（行高亮+行级解释+新手模式说明条）、Variables/Memory/CallStack 面板、PlaybackBar、VisualizationShell 组合容器。
 
+- P3：7 种排序（纯函数版 + 步骤版 + 计数器 + 复杂度/稳定性元数据 + 各自教学 C 代码）、顺序/二分查找（含无序告警）、compareSorts 多算法比较数据基础。
+
 ### Fixed
 - bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
 - deletePure 情形三"前驱即左孩子"分支挂接错误。
