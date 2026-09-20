@@ -21,7 +21,7 @@
 - **测试**：每结构独立 test 文件 + 属性断言（BST 中序递增、堆性质全量断言）。
 - **完成标准**：核心逻辑可被上层安全依赖。
 
-## P2 Visualizer Engine ⬜
+## P2 Visualizer Engine ✅
 - **目标**：Step 模型定稿 + 播放控制器 + 通用面板组件。
 - **功能**：types.ts 定稿、usePlayback（含 5 档速度/快照回退）、CodePanel/VariablesPanel/MemoryPanel/CallStackPanel、PlaybackBar。
 - **验收**：引擎测试全绿（next/prev/restart/jump/速度/边界）。
