@@ -7,3 +7,11 @@
 ### Added
 - 完成全部开发文档（PRODUCT / REQUIREMENTS / ARCHITECTURE / DATA_STRUCTURE_SPEC / VISUALIZATION_SPEC / C_CODE_SPEC / EXERCISE_SPEC / JUDGE_SPEC / DATA_SPEC / UI_UX_SPEC / TEST_PLAN / ROADMAP / CHANGELOG）。
 - Architecture Review：确认技术选型（Web 内核 + 可选 Electron 外壳、sql.js、快照回退、CodeMirror），修正了循环队列判满约定、BST 删除采用中序前驱等决策并回写文档。
+- P0：Vite + React + TS strict 脚手架、ESLint 边界规则（core 禁 UI 依赖）、Vitest 流水线（verify = lint+typecheck+test+build）、GitHub 仓库创建。
+- P1：核心类型系统（Step / VisualState / MemorySnapshot）、StepRecorder（structuredClone 快照 + deepFreeze 防御性不可变）、SimMem 模拟内存面板；顺序表（含扩容三步搬移）、单链表（插入两步接线/删除绕过/销毁先存 next）、双向链表（四步插入/两步绕过）、顺序栈/链栈/括号匹配、循环队列（wrap-around）/链队列（空队特判）/假溢出演示、二叉树四种遍历（CallStack 同步）、BST（删除三情形 + 中序前驱）、堆（上滤/下滤/Floyd 建堆）、图（邻接矩阵/表、增删点边、DFS 递归栈/BFS 队列）；全部配教学 C 代码与 codeLine 映射。
+
+### Fixed
+- bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
+- deletePure 情形三"前驱即左孩子"分支挂接错误。
+- graphFrom 无向图只存单向边导致邻接矩阵不对称、DFS 邻居缺失。
+- StepRecorder.finish 递归冻结全部步骤（快照防篡改）。

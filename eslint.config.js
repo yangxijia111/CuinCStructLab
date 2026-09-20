@@ -36,6 +36,15 @@ export default tseslint.config(
       '@typescript-eslint/only-throw-error': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // strictTypeChecked 中对教学代码过于苛刻的风格规则，显式关闭（tsc strict 仍然全量生效）：
+      '@typescript-eslint/restrict-template-expressions': 'off', // 模板串内嵌数字/布尔是常态
+      '@typescript-eslint/no-non-null-assertion': 'off', // 已知非空场景允许 !
+      '@typescript-eslint/no-unnecessary-condition': 'off', // 允许防御性条件
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-meaningless-void-operator': 'off',
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/no-dynamic-delete': 'off', // Record<id, node> 按动态 id 删除是数据结构核心操作
     },
   },
 
