@@ -45,6 +45,7 @@ export default tseslint.config(
       '@typescript-eslint/no-confusing-void-expression': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
       '@typescript-eslint/no-dynamic-delete': 'off', // Record<id, node> 按动态 id 删除是数据结构核心操作
+      '@typescript-eslint/unbound-method': 'off', // Context/回调全部为 useCallback 闭包，不依赖 this
     },
   },
 

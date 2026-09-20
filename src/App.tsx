@@ -1,21 +1,40 @@
-import { Routes, Route } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { AppLayout } from './ui/AppLayout';
+import { AppStoreProvider } from './ui/AppStore';
+import { ChapterPage, CourseListPage } from './pages/CoursePage';
+import {
+  AlgorithmsPage,
+  BankPage,
+  CodingPage,
+  HomePage,
+  LabPage,
+  SearchPage,
+  SettingsPage,
+  StatsPage,
+  StructuresPage,
+  WrongBookPage,
+} from './pages/Placeholder';
 
-/**
- * 应用根组件：P0 阶段为最小骨架，后续 Phase 逐步接入布局与页面。
- */
 export function App(): React.ReactElement {
   return (
-    <Routes>
-      <Route path="/" element={<HomePlaceholder />} />
-    </Routes>
-  );
-}
-
-function HomePlaceholder(): React.ReactElement {
-  return (
-    <main className="page">
-      <h1>CuinCStructLab</h1>
-      <p>面向 C 语言初学者的数据结构学习平台（脚手架阶段）</p>
-    </main>
+    <AppStoreProvider>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/course" element={<CourseListPage />} />
+          <Route path="/course/:id" element={<ChapterPage />} />
+          <Route path="/structures" element={<StructuresPage />} />
+          <Route path="/algorithms" element={<AlgorithmsPage />} />
+          <Route path="/lab" element={<LabPage />} />
+          <Route path="/coding" element={<CodingPage />} />
+          <Route path="/bank" element={<BankPage />} />
+          <Route path="/wrong-book" element={<WrongBookPage />} />
+          <Route path="/stats" element={<StatsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="*" element={<HomePage />} />
+        </Route>
+      </Routes>
+    </AppStoreProvider>
   );
 }
