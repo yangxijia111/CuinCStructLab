@@ -143,24 +143,6 @@ export function BankPage(): React.ReactElement {
   );
 }
 
-export function WrongBookPage(): React.ReactElement {
-  return (
-    <div className="page">
-      <h1>错题本</h1>
-      <p className="page-lead">（P9 开发中）答错的题目会自动收集到这里。</p>
-    </div>
-  );
-}
-
-export function StatsPage(): React.ReactElement {
-  return (
-    <div className="page">
-      <h1>学习统计</h1>
-      <p className="page-lead">（P10 开发中）完成度、正确率、连续学习天数将在此展示。</p>
-    </div>
-  );
-}
-
 export function SettingsPage(): React.ReactElement {
   return (
     <div className="page">

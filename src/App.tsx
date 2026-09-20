@@ -2,18 +2,12 @@ import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from './ui/AppLayout';
 import { AppStoreProvider } from './ui/AppStore';
 import { ChapterPage, CourseListPage } from './pages/CoursePage';
-import {
-  AlgorithmsPage,
-  CodingPage,
-  HomePage,
-  SearchPage,
-  SettingsPage,
-  StatsPage,
-  StructuresPage,
-  WrongBookPage,
-} from './pages/Placeholder';
+import { AlgorithmsPage, CodingPage, HomePage, SettingsPage, StructuresPage } from './pages/Placeholder';
 import { LabPage } from './pages/LabPage';
 import { BankPage } from './pages/BankPage';
+import { WrongBookPage } from './pages/WrongBookPage';
+import { StatsPage } from './pages/StatsPage';
+import { SearchPage } from './pages/SearchPage';
 
 export function App(): React.ReactElement {
   return (
