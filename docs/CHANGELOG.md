@@ -16,6 +16,9 @@
 
 - P4：课程内容数据模型（14 段教学结构 + vizOp 锚点）、全部 14 章内容（Ch0 预备知识 ~ Ch13 排序，含 30+ 段教学 C 代码与行级 notes）、App 布局（侧栏导航/新手模式开关/主题切换）、课程列表页 + 章节页三栏布局（左目录/中正文/右代码面板）、AppStore 全局状态、内容完整性测试。
 
+- P5：ArrayView（index/value/写操作突出/容量标尺）、BarsView、ListView（节点双格/指针 chips/floating 行）、StackView、QueueView（环形格子+front/rear 游标）、StateRenderer 分发；Labs 注册表（7 个线性实验室，含 Ch0 指针内存演示、假溢出演示、括号匹配）；LabPage（结构选择/数据初始化/操作参数/动画执行）；行号审计测试与三者同步性集成测试。
+- 行号系统重构：全部数据结构模块改用 buildLineMap（按 C 代码文本运行时定位行号），修复多处硬编码行号偏移导致的"动画与代码不同步"。
+
 ### Fixed
 - bstInsert 缓存旧快照节点引用导致父指针未接上（断链）——改为 mutate 内按 id 重新定位。
 - deletePure 情形三"前驱即左孩子"分支挂接错误。

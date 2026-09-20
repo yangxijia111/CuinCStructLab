@@ -41,7 +41,7 @@
 - **测试**：内容完整性测试（结构字段、codeLine 映射、id 唯一）。
 - **完成标准**：能从头读到尾学完 14 章（文字+代码层面）。
 
-## P5 线性结构可视化 + Playground（一） ⬜
+## P5 线性结构可视化 + Playground（一） ✅
 - **目标**：数组/顺序表/链表/双向链表/栈/队列的渲染器与互动实验。
 - **功能**：ArrayView/ListView/StackView/QueueView/MemoryPanel 联动、实验室页框架（结构选择/数据输入/操作执行）、排序外全部线性操作动画。
 - **验收**：同步性集成测试（codeLine/variables/highlight 一致）；手工清单：`10 20 30` 插入 pos=1 value=15 → `10→15→20→30`。

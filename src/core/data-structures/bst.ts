@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder, otherVar, ptrVar } from '../recorder';
 import type { TreeNodeV, TreeState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const BST_C_CODE: string[] = [
@@ -93,6 +94,28 @@ export const BST_C_CODE: string[] = [
   '    return root;',
   '}',
 ];
+
+const L = buildLineMap(BST_C_CODE, {
+  insertMalloc: 'TreeNode *node = (TreeNode *)malloc(sizeof(TreeNode));',
+  insertLess: 'root->left = bstInsert(root->left, value);',
+  insertGreater: 'root->right = bstInsert(root->right, value);',
+  insertEnd: 'return root;',
+  searchNull: 'return NULL;                 /* 走到空位 = 不存在 */',
+  searchHit: 'return root;                 /* 找到 */',
+  searchLeft: 'return bstSearch(root->left, value);',
+  searchRight: 'return bstSearch(root->right, value);',
+  delLess: 'root->left = bstDelete(root->left, value);',
+  delGreater: 'root->right = bstDelete(root->right, value);',
+  delFound: '找到目标节点 root',
+  delLeaf: '情形一：叶节点',
+  delFree: 'free(root);',
+  delOnlyRight: '只有右孩子，右孩子顶替自己',
+  delOnlyLeft: '只有左孩子，左孩子顶替自己',
+  delTwo: '两个孩子都在',
+  delPrevSeek: 'while (prev->right != NULL) {',
+  delPrevCopy: 'root->data = prev->data;',
+  delPrevRecur: 'root->left = bstDelete(root->left, prev->data);',
+});
 
 /* ============ 构造 ============ */
 
@@ -207,7 +230,7 @@ export function bstInsert(state: TreeState, value: number): VizOutcome<TreeState
       type: 'create',
       title: `树是空的：newNode(${value}) 直接成为根`,
       description: `root == NULL，malloc 新节点作为根。地址 ${addr}（模拟）。`,
-      codeLine: 14,
+      codeLine: L.insertMalloc,
       variables: [ptrVar('root', addr, id), otherVar('value', String(value))],
       memory: mem.snapshot(),
       highlight: [id],
@@ -234,7 +257,7 @@ export function bstInsert(state: TreeState, value: number): VizOutcome<TreeState
         title: `root == NULL：malloc 新节点（${value}），接上父指针`,
         description: `走到空位，这里就是 ${value} 的位置。地址 ${addr}（模拟）。`,
         beginnerNote: `插入总是发生在叶子层：一路比较下来最后撞到 NULL，把新节点挂在这个 NULL 上。父节点的 ${parentSide} 指针改指新节点。`,
-        codeLine: 14,
+        codeLine: L.insertMalloc,
         variables: [otherVar('value', String(value)), ptrVar('新节点', addr, id)],
         memory: mem.snapshot(),
         highlight: [id],
@@ -258,7 +281,7 @@ export function bstInsert(state: TreeState, value: number): VizOutcome<TreeState
         type: 'compare',
         title: `${value} < ${curNode.value}：往左子树走`,
         description: `BST 性质：比当前节点小的值只可能在左子树。`,
-        codeLine: 25,
+        codeLine: L.insertLess,
         variables: [otherVar('value', String(value)), ptrVar('root', mem.addrOf(curId), curId)],
         memory: mem.snapshot(),
         highlight: [curId, curNode.left ?? ''].filter(Boolean),
@@ -274,7 +297,7 @@ export function bstInsert(state: TreeState, value: number): VizOutcome<TreeState
         type: 'compare',
         title: `${value} > ${curNode.value}：往右子树走`,
         description: `比当前节点大的值只可能在右子树。`,
-        codeLine: 27,
+        codeLine: L.insertGreater,
         variables: [otherVar('value', String(value)), ptrVar('root', mem.addrOf(curId), curId)],
         memory: mem.snapshot(),
         highlight: [curId, curNode.right ?? ''].filter(Boolean),
@@ -290,7 +313,7 @@ export function bstInsert(state: TreeState, value: number): VizOutcome<TreeState
         type: 'info',
         title: `${value} == ${curNode.value}：已存在，不插入重复值`,
         description: '本实现约定 BST 不存重复值，直接返回。',
-        codeLine: 29,
+        codeLine: L.insertEnd,
         variables: [otherVar('value', String(value))],
         memory: mem.snapshot(),
         highlight: [curId],
@@ -314,7 +337,7 @@ export function bstSearch(state: TreeState, value: number): VizOutcome<TreeState
         type: 'visit',
         title: `value == root->data：找到了 ${value}`,
         description: '查找成功。每次比较都排除一整棵子树，这是 BST 高效的来源。',
-        codeLine: 40,
+        codeLine: L.searchHit,
         variables: [otherVar('value', String(value)), ptrVar('root', mem.addrOf(curId), curId)],
         memory: mem.snapshot(),
         highlight: [curId],
@@ -331,7 +354,7 @@ export function bstSearch(state: TreeState, value: number): VizOutcome<TreeState
       description: goLeft
         ? '目标更小，只可能在左子树，右子树整棵被排除。'
         : '目标更大，只可能在右子树，左子树整棵被排除。',
-      codeLine: goLeft ? 44 : 46,
+      codeLine: goLeft ? L.searchLeft : L.searchRight,
       variables: [otherVar('value', String(value)), ptrVar('root', mem.addrOf(curId), curId)],
       memory: mem.snapshot(),
       highlight: [curId],
@@ -346,7 +369,7 @@ export function bstSearch(state: TreeState, value: number): VizOutcome<TreeState
     type: 'info',
     title: `root == NULL：${value} 不在这棵树里`,
     description: '走到空位还没找到，查找失败。BST 查找失败同样高效：一路被"引导"到唯一可能的位置。',
-    codeLine: 37,
+    codeLine: L.searchNull,
     variables: [otherVar('value', String(value)), ptrVar('root', null)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -375,7 +398,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
       type: 'compare',
       title: goLeft ? `${value} < ${node.value}：目标若存在，在左子树` : `${value} > ${node.value}：目标若存在，在右子树`,
       description: '先定位要删除的节点，思路与查找一致。',
-      codeLine: goLeft ? 54 : 56,
+      codeLine: goLeft ? L.delLess : L.delGreater,
       variables: [otherVar('value', String(value)), ptrVar('root', mem.addrOf(curId), curId)],
       memory: mem.snapshot(),
       highlight: [curId],
@@ -389,7 +412,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
   }
 
   if (curId === null) {
-    rec.fail('没找到', `树中不存在值为 ${value} 的节点，删除失败。`, 52);
+    rec.fail('没找到', `树中不存在值为 ${value} 的节点，删除失败。`, L.delLess);
     return rec.finish();
   }
 
@@ -398,7 +421,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
     type: 'visit',
     title: `找到目标 ${value}（左孩子${target.left === null ? '无' : `=${rec.state.nodes[target.left]?.value}`}，右孩子${target.right === null ? '无' : `=${rec.state.nodes[target.right]?.value}`}）`,
     description: '接下来按子节点个数分三种情形处理。',
-    codeLine: 59,
+    codeLine: L.delFound,
     variables: [ptrVar('target', mem.addrOf(curId), curId)],
     memory: mem.snapshot(),
     highlight: [curId],
@@ -410,7 +433,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
       type: 'info',
       title: '情形一：叶节点（左右都是 NULL）',
       description: '最简单：把父节点指向它的指针置 NULL，再 free。',
-      codeLine: 61,
+      codeLine: L.delLeaf,
       memory: mem.snapshot(),
       highlight: [curId],
     });
@@ -419,7 +442,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
       type: 'delete',
       title: `父指针置 NULL，free(${value})`,
       description: `叶节点没有任何孩子需要接管。删除后树仍满足 BST 性质。`,
-      codeLine: 63,
+      codeLine: L.delFree,
       memory: mem.snapshot(),
       highlight: [curId],
       mutate: (s) => {
@@ -446,7 +469,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
       title: `情形二：只有一个孩子（${childValue}）`,
       description: `让唯一的孩子"顶替"自己：父指针直接跨过目标指向孙子。BST 性质不受影响（整棵子树一起搬）。`,
       beginnerNote: '被删节点的子树整体性质不变，挂到祖父下面依然有序——就像排队时中间人走了，后面的人整体上前一步。',
-      codeLine: target.left === null ? 67 : 72,
+      codeLine: target.left === null ? L.delOnlyRight : L.delOnlyLeft,
       memory: mem.snapshot(),
       highlight: [curId, child ?? ''].filter(Boolean),
     });
@@ -455,7 +478,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
       type: 'delete',
       title: `父指针改指 ${childValue}，free(${value})`,
       description: '绕过目标完成删除。',
-      codeLine: target.left === null ? 69 : 74,
+      codeLine: L.delFree,
       memory: mem.snapshot(),
       highlight: [child ?? ''],
       mutate: (s) => {
@@ -481,7 +504,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
     title: '情形三：两个孩子都在，不能简单绕过',
     description: '两个孩子都要保留。策略：用"中序前驱"（左子树里最大的节点）的值顶替目标值，再去左子树里删掉那个前驱（它最多只有左孩子，退化为情形一/二）。',
     beginnerNote: '也可以用中序后继（右子树最小）。两种都正确，本平台采用前驱方案：一直向右走到底就是左子树的最大值。',
-    codeLine: 77,
+    codeLine: L.delTwo,
     memory: mem.snapshot(),
     highlight: [curId, leftChild, rightChild],
   });
@@ -496,7 +519,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
     type: 'move',
     title: `从左孩子 ${rec.state.nodes[leftChild]!.value} 一路向右走到底：中序前驱是 ${prevValue}`,
     description: `左子树的最右下角节点就是整棵树中小于 ${value} 的最大值。`,
-    codeLine: 81,
+    codeLine: L.delPrevSeek,
     memory: mem.snapshot(),
     highlight: [prevId],
     mutate: (s) => {
@@ -508,7 +531,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
     type: 'assign',
     title: `root->data = prev->data：${value} → ${prevValue}（只复制值，节点不动）`,
     description: '把前驱的值写到目标节点上。此时树里出现两个相同值，接下来删除左子树里的那个。',
-    codeLine: 84,
+    codeLine: L.delPrevCopy,
     memory: mem.snapshot(),
     highlight: [curId, prevId],
     mutate: (s) => {
@@ -520,7 +543,7 @@ export function bstDelete(state: TreeState, value: number): VizOutcome<TreeState
     type: 'delete',
     title: `再对左子树执行 bstDelete(左子树根, ${prevValue})，删掉多余的前驱`,
     description: `前驱节点最多只有一个（左）孩子，这次删除一定落在情形一或情形二。递归完成后整棵树仍是 BST。`,
-    codeLine: 85,
+    codeLine: L.delPrevRecur,
     memory: mem.snapshot(),
     highlight: [prevId],
     mutate: (s) => {

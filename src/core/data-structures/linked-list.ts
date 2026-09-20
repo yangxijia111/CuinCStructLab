@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder, intVar, ptrVar } from '../recorder';
 import type { ListState, ListNodeV, PointerLabel, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const LINKED_LIST_C_CODE: string[] = [
@@ -152,6 +153,65 @@ export const LINKED_LIST_C_CODE: string[] = [
   '}',
 ];
 
+/** 关键行号表（按代码文本定位） */
+const L = buildLineMap(LINKED_LIST_C_CODE, {
+  initMalloc: 'head = (Node *)malloc(sizeof(Node));',
+  pushFrontFn: 'int listPushFront(',
+  pushFrontMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
+  pushFrontNewNext: 'newNode->next = head->next;',
+  pushFrontHeadNext: 'head->next = newNode;',
+  pushBackMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
+  pushBackCurrent: 'Node *current = head;',
+  pushBackWhile: 'while (current->next != NULL)',
+  pushBackMove: 'current = current->next;',
+  pushBackNewNull: 'newNode->next = NULL;',
+  pushBackLink: 'current->next = newNode;',
+  insertFn: 'int listInsertAt(',
+  insertRange: 'if (pos < 0)',
+  insertPrev: 'Node *prev = head;',
+  insertMove: 'prev = prev->next;',
+  insertMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
+  insertNewNext: 'newNode->next = prev->next;',
+  insertPrevNext: 'prev->next = newNode;',
+  delValFn: 'int listDeleteValue(',
+  delValPrev: 'Node *prev = head;',
+  delValWhile: 'while (prev->next != NULL && prev->next->data != value)',
+  delValMove: 'prev = prev->next;',
+  delValMiss: 'return -1;                /* 走到头也没找到 */',
+  delValTarget: 'Node *target = prev->next;',
+  delValBypass: 'prev->next = target->next;',
+  delValFree: 'free(target);',
+  delAtFn: 'int listDeleteAt(',
+  delAtRange: 'if (pos < 0)',
+  delAtPrev: 'Node *prev = head;',
+  delAtMove: 'prev = prev->next;',
+  delAtMiss: 'return -1;                /* pos 越界 */',
+  delAtTarget: 'Node *target = prev->next;',
+  delAtBypass: 'prev->next = target->next;',
+  delAtFree: 'free(target);',
+  findFn: 'Node *listFind(',
+  findCurrent: 'Node *current = head->next;',
+  findWhile: 'while (current != NULL)',
+  findCmp: 'if (current->data == value)',
+  findMove: 'current = current->next;',
+  findMiss: 'return NULL;',
+  traverseFn: 'void listTraverse(',
+  traverseCurrent: 'Node *current = head->next;',
+  traverseWhile: 'while (current != NULL)',
+  traversePrint: 'printf("%d -> ", current->data);',
+  traverseMove: 'current = current->next;',
+  traverseNull: 'printf("NULL',
+  setFn: 'int listSet(',
+  setFind: 'Node *p = listFind(from);',
+  setMiss: 'return -1;',
+  setWrite: 'p->data = to;',
+  destroyFn: 'void listDestroy(',
+  destroyCurrent: 'Node *current = head;',
+  destroySave: 'Node *next = current->next;',
+  destroyFree: 'free(current);',
+  destroyNull: 'head = NULL;',
+});
+
 /* ============ 状态构造与读取 ============ */
 
 /** 空链表（含哨兵头节点 n0） */
@@ -187,7 +247,7 @@ export function listFrom(values: number[]): VizOutcome<ListState> {
     description: `分配了头节点和 ${values.length} 个数据节点，每个节点的 next 指向下一个，末尾 next = NULL。`,
     beginnerNote:
       '每个节点是独立的一块堆内存，靠 next 指针串起来。头节点（哨兵）不存数据，好处是：插入/删除第一个元素时不用特殊处理 head 本身。',
-    codeLine: 16,
+    codeLine: L.initMalloc,
     variables: [ptrVar('head', mem.addrOf('n0'), 'n0')],
     memory: mem.snapshot(),
     highlight: rec.state.nodes.map((n) => n.id),
@@ -354,8 +414,8 @@ function nodeValue(state: ListState, id: string): number | string {
 export function listPushFront(state: ListState, value: number): VizOutcome<ListState> {
   const rec = new StepRecorder<ListState>(state);
   const mem = rebuildListMem(state);
-  const id = allocNode(rec, mem, value, 27);
-  linkAfter(rec, mem, 'n0', id, 32, 33, 'head');
+  const id = allocNode(rec, mem, value, L.pushFrontMalloc);
+  linkAfter(rec, mem, 'n0', id, L.pushFrontNewNext, L.pushFrontHeadNext, 'head');
   return rec.finish();
 }
 
@@ -369,7 +429,7 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
     type: 'move',
     title: 'Node *current = head;',
     description: '从哨兵出发找尾巴。',
-    codeLine: 41,
+    codeLine: L.pushBackCurrent,
     variables: [ptrVar('current', mem.addrOf('n0'), 'n0')],
     memory: mem.snapshot(),
     highlight: ['n0'],
@@ -386,7 +446,7 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
         type: 'compare',
         title: 'current->next == NULL，到尾巴了',
         description: `当前停在${curId === 'n0' ? '头节点' : `值为 ${nodeValue(rec.state, curId)} 的节点`}，它的 next 是 NULL。`,
-        codeLine: 42,
+        codeLine: L.pushBackWhile,
         variables: [ptrVar('current', mem.addrOf(curId), curId)],
         memory: mem.snapshot(),
         highlight: [curId],
@@ -398,7 +458,7 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
       type: 'compare',
       title: 'current->next != NULL，还没到尾',
       description: `下一个节点存在（值 ${nodeValue(rec.state, stepTo)}），继续走。`,
-      codeLine: 42,
+      codeLine: L.pushBackWhile,
       variables: [ptrVar('current', mem.addrOf(curId), curId)],
       memory: mem.snapshot(),
       highlight: [curId, stepTo],
@@ -412,7 +472,7 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
       title: 'current = current->next;',
       description: `current 移动到值为 ${nodeValue(rec.state, stepTo)} 的节点。`,
       beginnerNote: `current->next 保存的是下一个节点的地址。把它赋给 current，current 就"向前走了一步"。注意只能一步步走，链表不能像数组那样直接跳到第 i 个。`,
-      codeLine: 43,
+      codeLine: L.pushBackMove,
       variables: [ptrVar('current', mem.addrOf(stepTo), stepTo)],
       memory: mem.snapshot(),
       highlight: [stepTo],
@@ -424,8 +484,8 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
     curId = stepTo;
   }
 
-  const id = allocNode(rec, mem, value, 33);
-  linkAfter(rec, mem, curId, id, 44, 49, 'current');
+  const id = allocNode(rec, mem, value, L.pushBackMalloc);
+  linkAfter(rec, mem, curId, id, L.pushBackNewNull, L.pushBackLink, 'current');
   return rec.finish();
 }
 
@@ -443,7 +503,7 @@ export function listInsertAt(state: ListState, pos: number, value: number): VizO
     type: 'move',
     title: 'Node *prev = head;',
     description: `要在下标 ${pos} 插入，需要先走到 ${pos} 的前一个节点。`,
-    codeLine: 54,
+    codeLine: L.insertPrev,
     variables: [ptrVar('prev', mem.addrOf('n0'), 'n0'), intVar('pos', pos)],
     memory: mem.snapshot(),
     highlight: ['n0'],
@@ -460,7 +520,7 @@ export function listInsertAt(state: ListState, pos: number, value: number): VizO
         type: 'info',
         title: `prev->next == NULL，链只有 ${i} 个节点，pos = ${pos} 夹取为末尾插入`,
         description: '教学实现里越界时静默尾插；工程上建议返回错误。',
-        codeLine: 55,
+        codeLine: L.insertMove,
         variables: [ptrVar('prev', mem.addrOf(prevId), prevId)],
         memory: mem.snapshot(),
         highlight: [prevId],
@@ -472,7 +532,7 @@ export function listInsertAt(state: ListState, pos: number, value: number): VizO
       type: 'move',
       title: `prev = prev->next;（第 ${i + 1} 步，走到值 ${nodeValue(rec.state, stepTo)}）`,
       description: `循环 i 从 0 到 pos-1，共走 ${pos} 步，让 prev 停在插入点的前一个。`,
-      codeLine: 59,
+      codeLine: L.insertMove,
       variables: [ptrVar('prev', mem.addrOf(stepTo), stepTo), intVar('i', i)],
       memory: mem.snapshot(),
       highlight: [stepTo],
@@ -484,8 +544,8 @@ export function listInsertAt(state: ListState, pos: number, value: number): VizO
     prevId = stepTo;
   }
 
-  const id = allocNode(rec, mem, value, 61);
-  linkAfter(rec, mem, prevId, id, 67, 68, 'prev');
+  const id = allocNode(rec, mem, value, L.insertMalloc);
+  linkAfter(rec, mem, prevId, id, L.insertNewNext, L.insertPrevNext, 'prev');
   return rec.finish();
 }
 
@@ -597,7 +657,7 @@ export function listDeleteValue(state: ListState, value: number): VizOutcome<Lis
     type: 'visit',
     title: `prev->next->data == ${value}，找到目标（值为 ${value} 的节点）`,
     description: `target 确认为值为 ${value} 的节点，准备绕过它。`,
-    codeLine: 77,
+    codeLine: L.delValTarget,
     variables: [ptrVar('prev', mem.addrOf(prevId), prevId), ptrVar('target', mem.addrOf(targetId), targetId)],
     memory: mem.snapshot(),
     highlight: [targetId],
@@ -623,7 +683,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
     type: 'move',
     title: 'Node *prev = head;',
     description: `要删下标 ${pos}，先让 prev 走到它前一个。`,
-    codeLine: 89,
+    codeLine: L.delAtPrev,
     variables: [ptrVar('prev', mem.addrOf('n0'), 'n0'), intVar('pos', pos)],
     memory: mem.snapshot(),
     highlight: ['n0'],
@@ -641,7 +701,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
       type: 'move',
       title: `prev = prev->next;（走到值 ${nodeValue(rec.state, stepTo)}）`,
       description: `第 ${i + 1} 步移动。`,
-      codeLine: 93,
+      codeLine: L.delAtMove,
       variables: [ptrVar('prev', mem.addrOf(stepTo), stepTo), intVar('i', i)],
       memory: mem.snapshot(),
       highlight: [stepTo],
@@ -662,7 +722,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
     type: 'visit',
     title: `target = prev->next（值为 ${nodeValue(rec.state, targetId)} 的节点）`,
     description: 'target 就是要删除的节点。',
-    codeLine: 99,
+    codeLine: L.delAtTarget,
     variables: [ptrVar('prev', mem.addrOf(prevId), prevId), ptrVar('target', mem.addrOf(targetId), targetId)],
     memory: mem.snapshot(),
     highlight: [targetId],
@@ -684,7 +744,7 @@ export function listFind(state: ListState, value: number): VizOutcome<ListState>
     type: 'move',
     title: 'Node *current = head->next;',
     description: '查找从第一个数据节点开始（头节点不存数据）。',
-    codeLine: 107,
+    codeLine: L.findCurrent,
     variables: [ptrVar('current', first === null ? null : mem.addrOf(first), first)],
     memory: mem.snapshot(),
     highlight: first === null ? [] : [first],
@@ -701,7 +761,7 @@ export function listFind(state: ListState, value: number): VizOutcome<ListState>
       type: hit ? 'visit' : 'compare',
       title: `current->data（${v}）== ${value} ？${hit ? '找到了' : '不相等'}`,
       description: hit ? `值为 ${value} 的节点找到，返回 current。` : '不是目标，current 继续后移。',
-      codeLine: 109,
+      codeLine: L.findCmp,
       variables: [ptrVar('current', mem.addrOf(cur), cur), intVar('value', value)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -713,7 +773,7 @@ export function listFind(state: ListState, value: number): VizOutcome<ListState>
         type: 'info',
         title: 'current == NULL，查找结束：不存在',
         description: `走到链表末尾也没有 ${value}，返回 NULL。`,
-        codeLine: 113,
+        codeLine: L.findMiss,
         variables: [ptrVar('current', null)],
         memory: mem.snapshot(),
         mutate: (s) => {
@@ -728,7 +788,7 @@ export function listFind(state: ListState, value: number): VizOutcome<ListState>
       title: 'current = current->next;',
       description: `current 移动到值为 ${nodeValue(rec.state, next)} 的节点。`,
       beginnerNote: '链表查找只能顺藤摸瓜：拿到当前节点 next 里存的地址，才能走到下一个节点。',
-      codeLine: 111,
+      codeLine: L.findMove,
       variables: [ptrVar('current', mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [next],
@@ -769,7 +829,7 @@ export function listSet(state: ListState, from: number, to: number): VizOutcome<
     type: 'assign',
     title: `current->data：${from} → ${to}`,
     description: '通过 current 指针改写数据域。',
-    codeLine: 128,
+    codeLine: L.setWrite,
     variables: [ptrVar('current', mem.addrOf(target), target)],
     memory: mem.snapshot(),
     highlight: [target],
@@ -793,7 +853,7 @@ export function listTraverse(state: ListState): VizOutcome<ListState> {
     type: 'move',
     title: 'Node *current = head->next;',
     description: '遍历从第一个数据节点开始。',
-    codeLine: 119,
+    codeLine: L.traverseCurrent,
     variables: [ptrVar('current', cur === null ? null : mem.addrOf(cur), cur)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -808,7 +868,7 @@ export function listTraverse(state: ListState): VizOutcome<ListState> {
       type: 'visit',
       title: `printf("%d -> ", current->data) 输出 ${v}`,
       description: `已输出：${seen.join(' -> ')} -> …`,
-      codeLine: 121,
+      codeLine: L.traversePrint,
       variables: [ptrVar('current', mem.addrOf(cur), cur)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -820,7 +880,7 @@ export function listTraverse(state: ListState): VizOutcome<ListState> {
       title: 'current = current->next;',
       description: `current 从值 ${v} 的节点移动到值 ${nodeValue(rec.state, next)} 的节点。`,
       beginnerNote: `current 当前指向值为 ${v} 的节点。current->next 保存下一个节点的地址。执行后，current 将移动到值为 ${nodeValue(rec.state, next)} 的节点。`,
-      codeLine: 122,
+      codeLine: L.traverseMove,
       variables: [ptrVar('current', mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [next],
@@ -839,7 +899,7 @@ export function listTraverse(state: ListState): VizOutcome<ListState> {
       seen.length === 0
         ? '链表为空，current 一开始就是 NULL，直接输出 NULL。'
         : `完整输出：${seen.join(' -> ')} -> NULL`,
-    codeLine: 123,
+    codeLine: L.traverseNull,
     variables: [ptrVar('current', null)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -864,7 +924,7 @@ export function listDestroy(state: ListState): VizOutcome<ListState> {
       type: 'assign',
       title: `Node *next = current->next;（先记住${next === null ? ' NULL' : `值 ${nodeValue(rec.state, next)}`}）`,
       description: 'free 之后再读 current->next 就是访问已释放内存（未定义行为），所以必须先把地址存进局部变量 next。',
-      codeLine: 141,
+      codeLine: L.destroySave,
       variables: [ptrVar('current', mem.addrOf(cur), cur), ptrVar('next', next === null ? null : mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [cur, next ?? ''].filter(Boolean),
@@ -881,7 +941,7 @@ export function listDestroy(state: ListState): VizOutcome<ListState> {
       type: 'free',
       title: `free(current)（释放${v === '-' ? '头节点' : `值 ${v} 的节点`}）`,
       description: '释放当前节点。',
-      codeLine: 142,
+      codeLine: L.destroyFree,
       variables: [ptrVar('next', next === null ? null : mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -897,7 +957,7 @@ export function listDestroy(state: ListState): VizOutcome<ListState> {
     type: 'info',
     title: 'head = NULL，销毁完成',
     description: '所有节点已释放，头指针置 NULL。共释放了全部堆内存，无泄漏。',
-    codeLine: 145,
+    codeLine: L.destroyNull,
     variables: [ptrVar('head', null)],
     memory: mem.snapshot(),
   });

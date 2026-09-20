@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder, indexVar, intVar } from '../recorder';
 import type { HeapState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const HEAP_C_CODE: string[] = [
@@ -92,6 +93,20 @@ export const HEAP_C_CODE: string[] = [
   '    }',
   '}',
 ];
+
+const L = buildLineMap(HEAP_C_CODE, {
+  insertWrite: 'h->data[i] = value;',
+  insertStop: '不再比父节点大',
+  insertSwap: 'swap(&h->data[i], &h->data[p]);',
+  siftStop: '比两个孩子都大',
+  siftSwap: 'swap(&h->data[i], &h->data[largest]);',
+  deleteEmpty: 'return -1;        /* 空堆 */',
+  deleteOut: '*out = h->data[0];',
+  deleteMove: 'h->data[0] = h->data[h->size - 1];',
+  heapifyFn: 'void heapify(Heap *h, int arr[], int n) {',
+  heapifyLoop: 'for (int i = n / 2 - 1; i >= 0; i--)',
+  heapifySift: 'siftDown(h, i, n);',
+});
 
 /* ============ 状态构造 ============ */
 
@@ -188,7 +203,7 @@ export function heapInsert(state: HeapState, value: number): VizOutcome<HeapStat
     title: `h->data[${state.order.length}] = ${value}（先放到数组末尾，堆可能暂时被破坏）`,
     description: `新元素先挂在完全二叉树的最后一个位置，size+1。`,
     beginnerNote: `完全二叉树用数组存的精髓：下标 i 的父节点是 (i-1)/2，不需要指针。新节点先放最后，再"爬"上去。`,
-    codeLine: 31,
+    codeLine: L.insertWrite,
     variables: [indexVar('i', state.order.length), intVar('h->size', state.order.length + 1)],
     memory: mem.snapshot(),
     highlight: [newId],
@@ -213,7 +228,7 @@ export function heapInsert(state: HeapState, value: number): VizOutcome<HeapStat
         type: 'compare',
         title: `data[${i}](${cv}) 不比父节点 data[${p}](${pv}) ${cmpWord}：到位，停止上滤`,
         description: `父节点已经${state.compare === 'max' ? '不小于' : '不大于'}新元素，堆性质恢复。`,
-        codeLine: 36,
+        codeLine: L.insertStop,
         variables: [indexVar('i', i), indexVar('p', p)],
         memory: mem.snapshot(),
         highlight: [childId, parentId],
@@ -225,7 +240,7 @@ export function heapInsert(state: HeapState, value: number): VizOutcome<HeapStat
       title: `data[${i}](${cv}) 比父节点 data[${p}](${pv}) ${cmpWord}：swap 后继续向上`,
       description: `与父节点交换，新元素向上"冒"。`,
       beginnerNote: `上滤最多走树高步 = O(log n)。每次只和父节点比较，兄弟之间不比较。`,
-      codeLine: 40,
+      codeLine: L.insertSwap,
       variables: [indexVar('i', i), indexVar('p', p)],
       memory: mem.snapshot(),
       highlight: [childId, parentId],
@@ -274,7 +289,7 @@ function siftDown(rec: StepRecorder<HeapState>, mem: SimMem, iStart: number, n: 
         type: 'compare',
         title: `data[${i}](${iv}) 已比两个孩子都${cmpWord}：到位，停止下滤`,
         description: '当前位置满足堆性质，下滤结束。',
-        codeLine: 57,
+        codeLine: L.siftStop,
         variables: [indexVar('i', i)],
         memory: mem.snapshot(),
         highlight: [rec.state.order[i]!],
@@ -286,7 +301,7 @@ function siftDown(rec: StepRecorder<HeapState>, mem: SimMem, iStart: number, n: 
       type: 'swap',
       title: `${bestWord}swap(data[${i}], data[${best}])：${iv} 与 ${bv} 交换`,
       description: `和更${cmpWord}的孩子交换，继续向下检查。`,
-      codeLine: 60,
+      codeLine: L.siftSwap,
       variables: [indexVar('i', i), indexVar('largest', best)],
       memory: mem.snapshot(),
       highlight: [rec.state.order[i]!, rec.state.order[best]!],
@@ -308,7 +323,7 @@ export function heapDeleteTop(state: HeapState): VizOutcome<HeapState> {
   const mem = heapMem(state);
 
   if (state.order.length === 0) {
-    rec.fail('空堆', 'h->size == 0，没有元素可删除。', 66);
+    rec.fail('空堆', 'h->size == 0，没有元素可删除。', L.deleteEmpty);
     return rec.finish();
   }
 
@@ -317,7 +332,7 @@ export function heapDeleteTop(state: HeapState): VizOutcome<HeapState> {
     type: 'delete',
     title: `*out = h->data[0]：取出堆顶 ${topValue}（${state.compare === 'max' ? '最大' : '最小'}值）`,
     description: `堆顶永远是${state.compare === 'max' ? '最大' : '最小'}元素，O(1) 取出。`,
-    codeLine: 70,
+    codeLine: L.deleteOut,
     variables: [intVar('*out', topValue)],
     memory: mem.snapshot(),
     highlight: [state.order[0]!],
@@ -328,7 +343,7 @@ export function heapDeleteTop(state: HeapState): VizOutcome<HeapState> {
       type: 'free',
       title: '堆空了，size = 0',
       description: '最后一个元素删除后堆为空。',
-      codeLine: 72,
+      codeLine: L.deleteEmpty,
       memory: mem.snapshot(),
       mutate: (s) => {
         s.order = [];
@@ -344,7 +359,7 @@ export function heapDeleteTop(state: HeapState): VizOutcome<HeapState> {
     title: `h->data[0] = h->data[size-1]：末尾元素 ${lastValue} 补到堆顶，size-1`,
     description: '删除堆顶后，把最后一个元素搬来补位，然后下滤恢复堆性质。',
     beginnerNote: '为什么用最后一个元素补位？因为只有它补上来，树才能保持"完全二叉树"的形状。',
-    codeLine: 71,
+    codeLine: L.deleteMove,
     memory: mem.snapshot(),
     highlight: [state.order[0]!],
     mutate: (s) => {
@@ -367,7 +382,7 @@ export function heapify(values: number[], compare: 'max' | 'min' = 'max'): VizOu
     type: 'init',
     title: `把数组 [${values.join(', ')}] 原样放入堆`,
     description: `建堆不排序，只要求每个父节点不小于（或不大于）孩子。先原样拷贝。`,
-    codeLine: 78,
+    codeLine: L.heapifyFn,
     memory: mem.snapshot(),
     highlight: values.map((_, i) => `h${i}`),
     mutate: (s) => {
@@ -388,7 +403,7 @@ export function heapify(values: number[], compare: 'max' | 'min' = 'max'): VizOu
     title: `从最后一个非叶节点 i = ${firstNonLeaf} 开始，倒着下滤到根`,
     description: `叶节点天然满足堆性质（没有孩子），只需要处理下标 0..${Math.max(firstNonLeaf, 0)}。这就是 Floyd 建堆 O(n) 的关键。`,
     beginnerNote: `n/2-1 是最后一个非叶节点：它是最后一个节点的父亲。倒序处理保证每个节点下滤时，它的子树已经是堆。`,
-    codeLine: 83,
+    codeLine: L.heapifyLoop,
     memory: mem.snapshot(),
   });
 
@@ -397,7 +412,7 @@ export function heapify(values: number[], compare: 'max' | 'min' = 'max'): VizOu
       type: 'move',
       title: `siftDown(h, ${i}, ${n})：处理下标 ${i}`,
       description: `对每个非叶节点执行下滤。`,
-      codeLine: 84,
+      codeLine: L.heapifySift,
       memory: mem.snapshot(),
       highlight: [rec.state.order[i] ?? ''],
     });

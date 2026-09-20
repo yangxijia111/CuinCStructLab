@@ -3,6 +3,7 @@
  */
 import { StepRecorder } from '../recorder';
 import type { GraphEdge, GraphState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const GRAPH_C_CODE: string[] = [
@@ -77,6 +78,23 @@ export const GRAPH_C_CODE: string[] = [
   '}',
 ];
 
+const L = buildLineMap(GRAPH_C_CODE, {
+  addEdgeFn: 'void mgAddEdge(',
+  addEdgeWrite: 'g->matrix[u][v] = 1;',
+  removeEdgeFn: 'void mgRemoveEdge(',
+  removeEdgeWrite: 'g->matrix[u][v] = 0;',
+  dfsFn: 'void dfs(MatrixGraph *g, int u) {',
+  dfsVisit: 'visited[u] = 1;',
+  dfsPrint: 'printf("%d ", u);',
+  dfsLoop: 'if (g->matrix[u][v] && !visited[v]) {',
+  dfsRecur: 'dfs(g, v);',
+  bfsFn: 'void bfs(MatrixGraph *g, int start) {',
+  bfsEnq: 'queue[rear++] = start;',
+  bfsOut: 'int u = queue[front++];',
+  bfsMark: 'visited[v] = 1;',
+  bfsEnqV: 'queue[rear++] = v;',
+});
+
 /* ============ 状态构造 ============ */
 
 /** 自动圆形布局坐标 */
@@ -118,7 +136,7 @@ export function graphFrom(
     type: 'create',
     title: `创建${directed ? '有向' : '无向'}图：${labels.length} 个顶点，${edges.length} 条边`,
     description: `顶点：${labels.join('、')}；边：${edges.map(([u, v]) => `${u}-${v}`).join('、')}${edges.length === 0 ? '（无）' : ''}。`,
-    codeLine: 8,
+    codeLine: L.addEdgeWrite,
     highlight: labels,
     mutate: (s) => {
       labels.forEach((label, i) => {
@@ -221,7 +239,7 @@ export function graphAddEdge(state: GraphState, u: string, v: string, directed?:
     description: isDirected
       ? `matrix[${u}][${v}] = 1。`
       : `无向图两个方向都置 1：matrix[${u}][${v}] = matrix[${v}][${u}] = 1。`,
-    codeLine: 15,
+    codeLine: L.addEdgeWrite,
     highlight: [u, v],
     mutate: (s) => {
       s.edges.push({ from: u, to: v });
@@ -242,7 +260,7 @@ export function graphRemoveEdge(state: GraphState, u: string, v: string, directe
     type: 'delete',
     title: `删除边 ${u} - ${v}`,
     description: isDirected ? '' : '无向图两个方向的记录一起清零。',
-    codeLine: 21,
+    codeLine: L.removeEdgeWrite,
     highlight: [u, v],
     mutate: (s) => {
       s.edges = s.edges.filter((e) => !(e.from === u && e.to === v) && !(e.from === v && e.to === u));
@@ -289,7 +307,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
     title: `从 ${start} 开始 DFS（深度优先：一条路走到黑，走不通再回头）`,
     description: 'visited 数组防止重复访问——图里有环时没有它会无限循环。',
     beginnerNote: 'DFS 像走迷宫：沿一条路一直走，走到死胡同就退回上一个岔路口换条路。递归调用栈（或显式栈）记住"从哪来"。',
-    codeLine: 45,
+    codeLine: L.dfsFn,
     highlight: [start],
     callStack: [],
     mutate: (s) => {
@@ -308,7 +326,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
       type: 'visit',
       title: `访问 ${u}，visited[${u}] = 1（递归栈深度 ${stack.length}）`,
       description: `已访问集合：${[...visited].join(' ')}。`,
-      codeLine: 46,
+      codeLine: L.dfsVisit,
       highlight: [u],
       callStack: stack.map((id) => ({ fn: `dfs(${id})` })),
       mutate: (s) => {
@@ -324,7 +342,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
           type: 'compare',
           title: `看邻居 ${v}：已访问过，跳过`,
           description: 'visited 拦住了已经走过的顶点，避免绕圈。',
-          codeLine: 50,
+          codeLine: L.dfsLoop,
           highlight: [u, v],
           callStack: stack.map((id) => ({ fn: `dfs(${id})` })),
           mutate: (s) => {
@@ -337,7 +355,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
         type: 'move',
         title: `发现未访问邻居 ${v}：递归 dfs(${v})`,
         description: `放下其他邻居，先深入 ${v}。`,
-        codeLine: 51,
+        codeLine: L.dfsRecur,
         highlight: [u, v],
         callStack: stack.map((id) => ({ fn: `dfs(${id})` })),
         mutate: (s) => {
@@ -352,7 +370,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
       type: 'return',
       title: `dfs(${u}) 的邻居都处理完了：回溯`,
       description: `${u} 的所有可达顶点都访问过了，返回上一层。`,
-      codeLine: 52,
+      codeLine: L.dfsLoop,
       highlight: [u],
       callStack: stack.map((id) => ({ fn: `dfs(${id})` })),
       mutate: (s) => {
@@ -367,7 +385,7 @@ export function graphDFS(state: GraphState, start: string): VizOutcome<GraphStat
     type: 'info',
     title: `DFS 完成，访问顺序：${[...visited].join(' → ')}`,
     description: `共访问 ${visited.size} 个顶点。`,
-    codeLine: 48,
+    codeLine: L.dfsPrint,
     callStack: [],
     mutate: (s) => {
       s.current = null;
@@ -395,7 +413,7 @@ export function graphBFS(state: GraphState, start: string): VizOutcome<GraphStat
     title: `从 ${start} 开始 BFS（广度优先：一圈一圈向外扩）`,
     description: '队列是 BFS 的核心：先发现的先处理，保证按距离分层。',
     beginnerNote: 'BFS 像水波扩散：从起点出发，先访问距离 1 的所有顶点，再距离 2 的……队列"先进先出"正好维持这个顺序。',
-    codeLine: 55,
+    codeLine: L.bfsFn,
     highlight: [start],
     mutate: (s) => {
       s.visited = [start];
@@ -412,7 +430,7 @@ export function graphBFS(state: GraphState, start: string): VizOutcome<GraphStat
       type: 'visit',
       title: `出队 ${u} 并访问（队列：[${queue.join(', ')}]）`,
       description: `访问顺序由入队顺序决定。已访问：${[...visited].join(' ')}。`,
-      codeLine: 60,
+      codeLine: L.bfsOut,
       highlight: [u],
       mutate: (s) => {
         s.current = u;
@@ -427,7 +445,7 @@ export function graphBFS(state: GraphState, start: string): VizOutcome<GraphStat
           type: 'compare',
           title: `看邻居 ${v}：已在队列或已访问，跳过`,
           description: '入队时立刻标记 visited，同一个顶点绝不会第二次入队。',
-          codeLine: 64,
+          codeLine: L.dfsLoop,
           highlight: [u, v],
           mutate: (s) => {
             s.next = v;
@@ -442,7 +460,7 @@ export function graphBFS(state: GraphState, start: string): VizOutcome<GraphStat
         title: `${v} 入队并标记 visited（队列：[${queue.join(', ')}]）`,
         description: `发现新顶点 ${v}：放到队尾等待访问。`,
         beginnerNote: '注意标记时机：入队时就标记（而不是出队时），否则同一顶点可能被多个邻居重复入队。',
-        codeLine: 65,
+        codeLine: L.bfsEnqV,
         highlight: [u, v],
         mutate: (s) => {
           s.next = v;
@@ -457,7 +475,7 @@ export function graphBFS(state: GraphState, start: string): VizOutcome<GraphStat
     type: 'info',
     title: `BFS 完成，访问顺序：${[...visited].join(' → ')}`,
     description: `共访问 ${visited.size} 个顶点。`,
-    codeLine: 62,
+    codeLine: L.bfsMark,
     mutate: (s) => {
       s.current = null;
       s.next = null;

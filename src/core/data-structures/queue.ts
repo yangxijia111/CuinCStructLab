@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder, intVar, otherVar, ptrVar } from '../recorder';
 import type { ListState, QueueState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 export const QUEUE_CAPACITY = 6;
 
@@ -17,7 +18,10 @@ export const QUEUE_C_CODE: string[] = [
   '',
   '/* ---------- 循环队列：留一个空位区分空与满 ---------- */',
   'typedef struct {',
-  '    int data[QUEUE_CAP];',
+  '    int data[QUEUE_CAP];'
+
+
+,
   '    int front;    /* 指向队头元素 */',
   '    int rear;     /* 指向下一个入队位置（空位） */',
   '} CircularQueue;',
@@ -113,6 +117,28 @@ export const QUEUE_C_CODE: string[] = [
   '}',
 ];
 
+const L = buildLineMap(QUEUE_C_CODE, {
+  cqInit: 'q->rear = 0;        /* front == rear 表示空 */',
+  cqFull: 'return (q->rear + 1) % QUEUE_CAP == q->front;',
+  cqEnqWrite: 'q->data[q->rear] = value;',
+  cqEnqRear: 'q->rear = (q->rear + 1) % QUEUE_CAP;',
+  cqEmpty: 'return q->front == q->rear;',
+  cqDeqOut: '*out = q->data[q->front];',
+  cqDeqFront: 'q->front = (q->front + 1) % QUEUE_CAP;',
+  lqEnqMalloc: 'QNode *node = (QNode *)malloc(sizeof(QNode));',
+  lqEnqBoth: 'q->front = node;',
+  lqEnqLink: 'q->rear->next = node;',
+  lqEnqRear: 'q->rear = node;',
+  lqDeqEmpty: 'return -1;             /* 空队列 */',
+  lqDeqOut: '*out = node->data;',
+  lqDeqFront: 'q->front = node->next;',
+  lqDeqRear: 'q->rear = NULL;',
+  lqDeqFree: 'free(node);',
+  naiveFull: 'return -1;   /* 假满 */',
+  naiveOut: '出队',
+  naiveWrite: 'data[++rear] = value;',
+});
+
 /* ============ 循环队列 ============ */
 
 export function emptyCircularQueue(capacity = QUEUE_CAPACITY): QueueState {
@@ -152,7 +178,7 @@ export function circularQueueFrom(values: number[], capacity = QUEUE_CAPACITY): 
     description: `front = 0，rear = ${values.length % capacity}。注意容量 ${capacity} 的循环队列只能装 ${capacity - 1} 个元素——留一个空位区分"空"和"满"。`,
     beginnerNote:
       '如果不留空位，front == rear 既可能表示空也可能表示满，无法区分。牺牲一个格子后：front == rear 是空，(rear+1)%cap == front 是满。',
-    codeLine: 16,
+    codeLine: L.cqInit,
     variables: [intVar('q->front', 0), intVar('q->rear', values.length % capacity)],
     memory: mem.snapshot(),
     highlight: values.map((_, i) => `q${i}`),
@@ -183,7 +209,7 @@ export function cqEnqueue(state: QueueState, value: number): VizOutcome<QueueSta
       type: 'error',
       title: '队满：(rear+1) % QUEUE_CAP == front',
       description: `rear = ${state.rear}，(rear+1) % ${state.capacity} = ${(state.rear + 1) % state.capacity} == front = ${state.front}，牺牲的空位到了，队列已满。`,
-      codeLine: 29,
+      codeLine: L.cqFull,
       variables: [intVar('q->front', state.front), intVar('q->rear', state.rear)],
       memory: mem.snapshot(),
     });
@@ -195,7 +221,7 @@ export function cqEnqueue(state: QueueState, value: number): VizOutcome<QueueSta
     type: 'insert',
     title: `q->data[q->rear] = ${value}（放进 rear 指的空位，下标 ${slot}）`,
     description: `${value} 从队尾进入。`,
-    codeLine: 32,
+    codeLine: L.cqEnqWrite,
     variables: [intVar('q->rear', slot), intVar('value', value)],
     memory: mem.snapshot(),
     highlight: [`q${slot}`],
@@ -218,7 +244,7 @@ export function cqEnqueue(state: QueueState, value: number): VizOutcome<QueueSta
     beginnerNote: wrapped
       ? '% 是取模（余数）：8 % 6 = 2，6 % 6 = 0。加 1 后越界就除以容量取余，下标永远落在 0..cap-1 之间，逻辑上形成一个环。'
       : '这一步 O(1)。循环队列 enqueue/dequeue 都是 O(1)。',
-    codeLine: 33,
+    codeLine: L.cqEnqRear,
     variables: [intVar('q->front', state.front), intVar('q->rear', newRear)],
     memory: mem.snapshot(),
     highlight: wrapped ? [`q0`] : [`q${newRear}`],
@@ -239,7 +265,7 @@ export function cqDequeue(state: QueueState): VizOutcome<QueueState> {
       type: 'error',
       title: '队空：front == rear',
       description: `front = rear = ${state.front}，队列里没有元素。`,
-      codeLine: 38,
+      codeLine: L.cqEmpty,
       variables: [intVar('q->front', state.front), intVar('q->rear', state.rear)],
       memory: mem.snapshot(),
     });
@@ -252,7 +278,7 @@ export function cqDequeue(state: QueueState): VizOutcome<QueueState> {
     type: 'delete',
     title: `*out = q->data[q->front]，出队 ${value}（下标 ${slot}）`,
     description: `队头 ${value} 离开队列。`,
-    codeLine: 41,
+    codeLine: L.cqDeqOut,
     variables: [otherVar('*out', String(value)), intVar('q->front', slot)],
     memory: mem.snapshot(),
     highlight: [`q${slot}`],
@@ -271,7 +297,7 @@ export function cqDequeue(state: QueueState): VizOutcome<QueueState> {
     description: wrapped
       ? `front 到达数组末尾后取模回到 0。剩余队列：[${cqValues(rec.state).join(', ')}]。`
       : `front 后移。剩余队列：[${cqValues(rec.state).join(', ')}]。`,
-    codeLine: 42,
+    codeLine: L.cqDeqFront,
     variables: [intVar('q->front', newFront), intVar('q->rear', state.rear)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -316,7 +342,7 @@ export function linkedQueueFrom(values: number[]): VizOutcome<ListState> {
     type: 'create',
     title: `创建链队列 front → ${values.join(' → ')} → NULL ← rear`,
     description: 'front 指向队头（出队端），rear 指向队尾（入队端）。',
-    codeLine: 52,
+    codeLine: L.cqInit,
     variables: [ptrVar('q->front', first === null ? null : mem.addrOf(first), first), ptrVar('q->rear', last === null ? null : mem.addrOf(last), last)],
     memory: mem.snapshot(),
     highlight: rec.state.nodes.map((n) => n.id),
@@ -339,7 +365,7 @@ export function lqEnqueue(state: ListState, value: number): VizOutcome<ListState
     type: 'create',
     title: `node = malloc(sizeof(QNode))，data = ${value}（${addr}）`,
     description: '新节点 next 置 NULL——它将成为新的队尾。',
-    codeLine: 60,
+    codeLine: L.lqEnqMalloc,
     variables: [ptrVar('node', addr, id), intVar('node->data', value)],
     memory: mem.snapshot(),
     highlight: [id],
@@ -356,7 +382,7 @@ export function lqEnqueue(state: ListState, value: number): VizOutcome<ListState
       title: '队列为空：q->front = node; q->rear = node;（两个指针都指向唯一节点）',
       description: '空队列插入时 front 和 rear 要同时更新，这是最容易漏写的分支。',
       beginnerNote: '只更新 rear 的话 front 还是 NULL，出队时直接崩溃。链队列的空队特判必须背下来。',
-      codeLine: 68,
+      codeLine: L.lqEnqBoth,
       variables: [ptrVar('q->front', addr, id), ptrVar('q->rear', addr, id)],
       memory: mem.snapshot(),
       highlight: [id],
@@ -374,7 +400,7 @@ export function lqEnqueue(state: ListState, value: number): VizOutcome<ListState
       type: 'assign',
       title: `q->rear->next = node;（原队尾${rearId === null ? '' : `（值 ${state.nodes[state.nodes.length - 1]?.value}）`}接上新节点）`,
       description: '新节点挂到队尾后面。',
-      codeLine: 71,
+      codeLine: L.lqEnqLink,
       variables: [ptrVar('q->rear', mem.addrOf(rearId ?? ''), rearId), ptrVar('node', addr, id)],
       memory: mem.snapshot(),
       highlight: [rearId ?? '', id].filter(Boolean),
@@ -387,7 +413,7 @@ export function lqEnqueue(state: ListState, value: number): VizOutcome<ListState
       type: 'insert',
       title: 'q->rear = node;（rear 指向新队尾）',
       description: `${value} 入队完成。当前队列：[${state.nodes.map((n) => n.value).join(', ')}, ${value}]。`,
-      codeLine: 72,
+      codeLine: L.lqEnqRear,
       variables: [ptrVar('q->rear', addr, id)],
       memory: mem.snapshot(),
       highlight: [id],
@@ -405,7 +431,7 @@ export function lqDequeue(state: ListState): VizOutcome<ListState> {
   const mem = lqMem(state);
 
   if (state.nodes.length === 0) {
-    rec.fail('队空', 'q->front == NULL，队列里没有元素。', 78);
+    rec.fail('队空', 'q->front == NULL，队列里没有元素。', L.lqDeqEmpty);
     return rec.finish();
   }
 
@@ -417,7 +443,7 @@ export function lqDequeue(state: ListState): VizOutcome<ListState> {
     type: 'delete',
     title: `*out = node->data，出队 ${value}`,
     description: `队头节点（值 ${value}）的数据先取出。`,
-    codeLine: 82,
+    codeLine: L.lqDeqOut,
     variables: [otherVar('*out', String(value)), ptrVar('q->front', mem.addrOf(frontId), frontId)],
     memory: mem.snapshot(),
     highlight: [frontId],
@@ -434,7 +460,7 @@ export function lqDequeue(state: ListState): VizOutcome<ListState> {
       : 'front 后移到下一个节点。',
     beginnerNote: becomesEmpty
       ? '这是链队列第二个必背特判：队列从 1 个元素变 0 个时，rear 也必须置 NULL，否则下次入队会解引用已释放的 rear。' : undefined,
-    codeLine: becomesEmpty ? 85 : 83,
+    codeLine: becomesEmpty ? L.lqDeqRear : L.lqDeqFront,
     variables: [ptrVar('q->front', nextId === null ? null : mem.addrOf(nextId), nextId)],
     memory: mem.snapshot(),
     highlight: [nextId ?? frontId],
@@ -451,7 +477,7 @@ export function lqDequeue(state: ListState): VizOutcome<ListState> {
     type: 'free',
     title: `free(node)（释放值 ${value} 的节点）`,
     description: '出队节点必须释放。',
-    codeLine: 87,
+    codeLine: L.lqDeqFree,
     memory: mem.snapshot(),
     highlight: [frontId],
     mutate: (s) => {
@@ -502,7 +528,7 @@ export function naiveOverflowDemo(capacity = 5): { steps: Step<QueueState>[]; fa
         title: `入队 ${v} 失败：rear == QUEUE_CAP-1，报"满"（假溢出！）`,
         description: `但看画面：front = ${rec.state.front}，前面明明有 ${rec.state.front} 个空位！这就是"假溢出"——空间没用完却不能再用。解决：循环队列。`,
         beginnerNote: '朴素顺序队列 rear 只会一路上涨，前面的空位永远浪费。循环队列用取模让 rear 能"回头"。',
-        codeLine: 98,
+        codeLine: L.naiveFull,
         variables: [intVar('*rear', r), intVar('front', rec.state.front)],
         memory: mem.snapshot(),
       });
@@ -513,7 +539,7 @@ export function naiveOverflowDemo(capacity = 5): { steps: Step<QueueState>[]; fa
       type: 'insert',
       title: `data[++rear] = ${v}（rear：${r} → ${nr}）`,
       description: '朴素顺序队列：rear 只增不减。',
-      codeLine: 102,
+      codeLine: L.naiveWrite,
       variables: [intVar('*rear', nr)],
       memory: mem.snapshot(),
       highlight: [`q${nr}`],

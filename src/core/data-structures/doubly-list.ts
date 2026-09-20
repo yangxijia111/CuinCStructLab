@@ -5,6 +5,8 @@
  */
 import { SimMem, StepRecorder, intVar, ptrVar } from '../recorder';
 import type { ListState, ListNodeV, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
+
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const DOUBLY_LIST_C_CODE: string[] = [
@@ -118,6 +120,36 @@ export const DOUBLY_LIST_C_CODE: string[] = [
   '}',
 ];
 
+
+const L = buildLineMap(DOUBLY_LIST_C_CODE, {
+  initMalloc: 'head = (DNode *)malloc(sizeof(DNode));',
+  pushFrontMalloc: 'DNode *newNode = (DNode *)malloc(sizeof(DNode));',
+  pushFrontP1: 'newNode->prev = head;',
+  pushFrontP2: 'newNode->next = head->next;',
+  pushFrontP3: 'head->next->prev = newNode;',
+  pushFrontP4: 'head->next = newNode;',
+  pushBackMalloc: 'DNode *newNode = (DNode *)malloc(sizeof(DNode));',
+  pushBackTail: 'DNode *tail = head;',
+  pushBackMove: 'tail = tail->next;',
+  pushBackP1: 'newNode->prev = tail;',
+  pushBackP2: 'tail->next = newNode;',
+  delTarget: 'DNode *target = head->next;',
+  delWhile: 'while (target != NULL && target->data != value)',
+  delMiss: 'return -1;',
+  delBypass1: 'target->prev->next = target->next;',
+  delBypass2: 'target->next->prev = target->prev;',
+  delFree: 'free(target);',
+  fwdFn: 'void traverseForward(void)',
+  fwdPrint: 'printf("%d <-> ", current->data);',
+  bwdFn: 'void traverseBackward(void)',
+  bwdCurrent: 'DNode *current = head;',
+  bwdSeek: 'current = current->next;',
+  bwdPrint: 'printf("%d <-> ", current->data);',
+  bwdMove: 'current = current->prev;',
+  destroyFn: 'void listDestroy(void)',
+  destroyFree: 'free(current);',
+});
+
 /* ============ 状态构造与读取 ============ */
 
 export function emptyDoublyList(): ListState {
@@ -149,7 +181,7 @@ export function doublyListFrom(values: number[]): VizOutcome<ListState> {
     title: `创建双向链表 head <-> ${values.join(' <-> ')} <-> NULL`,
     description: `每个节点有 prev/next 两个指针，相邻节点互相指向。共 ${values.length} 个数据节点。`,
     beginnerNote: '双向链表每个节点多花一个指针的内存，换来"可以往回走"：找前驱 O(1)，单向链表要重新从头找。',
-    codeLine: 16,
+    codeLine: L.initMalloc,
     variables: [ptrVar('head', mem.addrOf('n0'), 'n0')],
     memory: mem.snapshot(),
     highlight: rec.state.nodes.map((n) => n.id),
@@ -306,8 +338,8 @@ function linkDoublyAfter(
 export function doublyPushFront(state: ListState, value: number): VizOutcome<ListState> {
   const rec = new StepRecorder<ListState>(state);
   const mem = rebuildDoublyMem(state);
-  const id = allocDNode(rec, mem, value, 26);
-  linkDoublyAfter(rec, mem, 'n0', id, { p1: 29, p2: 30, p3: 32, p4: 34 });
+  const id = allocDNode(rec, mem, value, L.pushFrontMalloc);
+  linkDoublyAfter(rec, mem, 'n0', id, { p1: L.pushFrontP1, p2: L.pushFrontP2, p3: L.pushFrontP3, p4: L.pushFrontP4 });
   return rec.finish();
 }
 
@@ -320,7 +352,7 @@ export function doublyPushBack(state: ListState, value: number): VizOutcome<List
     type: 'move',
     title: 'DNode *tail = head;',
     description: '从头部出发找尾巴。',
-    codeLine: 38,
+    codeLine: L.pushBackTail,
     variables: [ptrVar('tail', mem.addrOf('n0'), 'n0')],
     memory: mem.snapshot(),
     highlight: ['n0'],
@@ -337,7 +369,7 @@ export function doublyPushBack(state: ListState, value: number): VizOutcome<List
       type: 'move',
       title: 'tail = tail->next;',
       description: `tail 移动到值 ${nodeValue(rec.state, next)} 的节点。`,
-      codeLine: 40,
+      codeLine: L.pushBackMove,
       variables: [ptrVar('tail', mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [next],
@@ -349,9 +381,9 @@ export function doublyPushBack(state: ListState, value: number): VizOutcome<List
     cur = next;
   }
 
-  const id = allocDNode(rec, mem, value, 43);
+  const id = allocDNode(rec, mem, value, L.pushBackMalloc);
   // 尾插只有两步：prev 指向 tail，tail->next = newNode（next 为 NULL 无需第③步）
-  linkDoublyAfter(rec, mem, cur, id, { p1: 48, p2: 49, p3: 48, p4: 49 }, 'tail');
+  linkDoublyAfter(rec, mem, cur, id, { p1: L.pushBackP1, p2: L.pushBackP2, p3: L.pushBackP1, p4: L.pushBackP2 }, 'tail');
   return rec.finish();
 }
 
@@ -364,7 +396,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
     type: 'move',
     title: 'DNode *target = head->next;',
     description: '双向链表删除可以直接从目标出发（不需要 prev 指针），因为 target->prev 自带前驱。',
-    codeLine: 56,
+    codeLine: L.delTarget,
     variables: [ptrVar('target', mem.addrOf(nextOf(state, 'n0') ?? ''), nextOf(state, 'n0'))],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -384,7 +416,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
         type: 'visit',
         title: `target->data（${v}）== ${value}，找到目标`,
         description: '准备执行两步绕过。',
-        codeLine: 57,
+        codeLine: L.delWhile,
         variables: [ptrVar('target', mem.addrOf(cur), cur)],
         memory: mem.snapshot(),
         highlight: [cur],
@@ -396,7 +428,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
       type: 'compare',
       title: `target->data（${v}）!= ${value}，继续走`,
       description: 'target 后移。',
-      codeLine: 57,
+      codeLine: L.delWhile,
       variables: [ptrVar('target', next === null ? null : mem.addrOf(next), next)],
       memory: mem.snapshot(),
       highlight: [next ?? cur],
@@ -419,7 +451,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
         ? 'target->prev 是 NULL，跳过第①步'
         : `target->prev->next = target->next（前驱的 next 绕过目标${nextId === null ? '指向 NULL' : `指向值 ${nodeValue(rec.state, nextId)} 的节点`}）`,
     description: '第①步：让目标的前驱不再指向它。',
-    codeLine: 65,
+    codeLine: L.delBypass1,
     variables: [ptrVar('target', mem.addrOf(targetId), targetId)],
     memory: mem.snapshot(),
     highlight: [targetId, prevId ?? '', nextId ?? ''].filter(Boolean),
@@ -436,7 +468,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
         ? 'target->next 是 NULL，跳过第②步'
         : `target->next->prev = target->prev（后继的 prev 绕过目标${prevId === null ? '指向 NULL' : `指向值 ${nodeValue(rec.state, prevId)} 的节点`}）`,
     description: '第②步：让目标的后继也不再指向它。两步之后目标完全脱链。',
-    codeLine: 68,
+    codeLine: L.delBypass2,
     variables: [ptrVar('target', mem.addrOf(targetId), targetId)],
     memory: mem.snapshot(),
     highlight: [targetId, prevId ?? '', nextId ?? ''].filter(Boolean),
@@ -458,7 +490,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
     type: 'free',
     title: `free(target)（释放值 ${nodeValue(rec.state, targetId)} 的节点）`,
     description: '脱链节点必须释放。双向链表删除只需改两个指针，比单向少走一遍找前驱。',
-    codeLine: 70,
+    codeLine: L.delFree,
     memory: mem.snapshot(),
     highlight: [targetId],
     mutate: (s) => {
@@ -484,7 +516,7 @@ export function doublyTraverseForward(state: ListState): VizOutcome<ListState> {
       type: 'visit',
       title: `printf 输出 ${v}`,
       description: `正向（沿 next）已输出：${seen.join(' <-> ')}`,
-      codeLine: 77,
+      codeLine: L.fwdPrint,
       variables: [ptrVar('current', mem.addrOf(cur), cur)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -498,7 +530,7 @@ export function doublyTraverseForward(state: ListState): VizOutcome<ListState> {
     type: 'info',
     title: 'current == NULL，正向遍历结束',
     description: `正向结果：${seen.join(' <-> ')} <-> NULL`,
-    codeLine: 80,
+    codeLine: L.fwdFn,
     memory: mem.snapshot(),
   });
   return rec.finish();
@@ -513,7 +545,7 @@ export function doublyTraverseBackward(state: ListState): VizOutcome<ListState> 
     type: 'move',
     title: 'DNode *current = head; 然后一路 next 走到尾巴',
     description: '反向遍历要先花 O(n) 走到最后一个节点。',
-    codeLine: 85,
+    codeLine: L.bwdFn,
     variables: [ptrVar('current', mem.addrOf('n0'), 'n0')],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -528,7 +560,7 @@ export function doublyTraverseBackward(state: ListState): VizOutcome<ListState> 
       type: 'move',
       title: 'current = current->next;（找尾巴）',
       description: `走到值 ${nodeValue(rec.state, cur)} 的节点。`,
-      codeLine: 86,
+      codeLine: L.bwdCurrent,
       variables: [ptrVar('current', mem.addrOf(cur), cur)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -547,7 +579,7 @@ export function doublyTraverseBackward(state: ListState): VizOutcome<ListState> 
       type: 'visit',
       title: `printf 输出 ${v}`,
       description: `反向（沿 prev）已输出：${seen.join(' <-> ')}`,
-      codeLine: 89,
+      codeLine: L.bwdPrint,
       variables: [ptrVar('current', mem.addrOf(cur), cur)],
       memory: mem.snapshot(),
       highlight: [cur],
@@ -559,7 +591,7 @@ export function doublyTraverseBackward(state: ListState): VizOutcome<ListState> 
       title: 'current = current->prev;',
       description: `沿 prev 指针回退到值 ${nodeValue(rec.state, prev)} 的节点。`,
       beginnerNote: 'prev 里存的是前一个节点的地址。这就是双向链表的价值：不需要重新从头找。',
-      codeLine: 90,
+      codeLine: L.bwdMove,
       variables: [ptrVar('current', mem.addrOf(prev), prev)],
       memory: mem.snapshot(),
       highlight: [prev],
@@ -575,7 +607,7 @@ export function doublyTraverseBackward(state: ListState): VizOutcome<ListState> 
     type: 'info',
     title: 'current == head，反向遍历结束',
     description: `反向结果：${seen.join(' <-> ')} <-> (head)`,
-    codeLine: 92,
+    codeLine: L.bwdFn,
     memory: mem.snapshot(),
   });
   return rec.finish();
@@ -594,7 +626,7 @@ export function doublyDestroy(state: ListState): VizOutcome<ListState> {
       type: 'free',
       title: `free(current)（释放${v === '-' ? '头节点' : `值 ${v} 的节点`}，先记下 next = ${next === null ? 'NULL' : `值 ${nodeValue(rec.state, next)}`}）`,
       description: '与单向链表一致：先保存 next，再 free。',
-      codeLine: 99,
+      codeLine: L.destroyFree,
       memory: mem.snapshot(),
       highlight: [cur],
       mutate: (s) => {
@@ -608,7 +640,7 @@ export function doublyDestroy(state: ListState): VizOutcome<ListState> {
     type: 'info',
     title: 'head = NULL，销毁完成',
     description: '全部节点已释放。',
-    codeLine: 102,
+    codeLine: L.destroyFn,
     memory: mem.snapshot(),
   });
   return rec.finish();

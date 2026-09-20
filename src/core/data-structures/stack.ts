@@ -5,6 +5,7 @@
 import { SimMem, StepRecorder, intVar, otherVar, ptrVar } from '../recorder';
 import type { ListState, StackState, Step, VizOutcome } from '../types';
 import { emptyList } from './linked-list';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 顺序栈教学容量 */
 export const STACK_CAPACITY = 8;
@@ -120,6 +121,33 @@ export const STACK_C_CODE: string[] = [
   '}',
 ];
 
+const L = buildLineMap(STACK_C_CODE, {
+  pushFn: 'int stackPush(',
+  pushFull: 'return -1;        /* 栈满，放不进 */',
+  pushWrite: 's->data[s->top] = value;',
+  pushTop: 's->top = s->top + 1;',
+  popFn: 'int stackPop(',
+  popEmpty: 'return -1;        /* 空栈，没得弹 */',
+  popTop: 's->top = s->top - 1;',
+  popOut: '*out = s->data[s->top];',
+  peekFn: 'int stackPeek(',
+  peekOut: '*out = s->data[s->top - 1];',
+  linkedPushMalloc: 'StackNode *node = (StackNode *)malloc(sizeof(StackNode));',
+  linkedPushNext: 'node->next = top;',
+  linkedPushTop: 'top = node;',
+  linkedPopEmpty: 'return -1;       /* 空栈 */',
+  linkedPopOut: '*out = node->data;',
+  linkedPopTop: 'top = node->next;',
+  linkedPopFree: 'free(node);',
+  bracketFn: 'int bracketMatch(const char *s)',
+  bracketInit: 'stackInit(&st);',
+  bracketFor: 'for (int i = 0; s[i] !=',
+  bracketLeft: 'stackPush(&st, c);',
+  bracketEmpty: 'return 0;            /* 右括号多了 */',
+  bracketPop: 'stackPop(&st, &left);',
+  bracketEnd: 'return stackIsEmpty(&st);',
+});
+
 /* ============ 顺序栈 ============ */
 
 export function emptyArrayStack(capacity = STACK_CAPACITY): StackState {
@@ -143,7 +171,7 @@ export function arrayStackFrom(values: Array<number | string>, capacity = STACK_
     type: 'create',
     title: `创建顺序栈，已压入 [${values.join(', ')}]`,
     description: `top = ${values.length}，指向栈顶元素的下一个空位。`,
-    codeLine: 14,
+    codeLine: L.pushFn,
     variables: [intVar('s.top', values.length)],
     memory: mem.snapshot(),
     highlight: values.map((_, i) => `f${i}`),
@@ -163,7 +191,7 @@ export function arrayStackPush(state: StackState, value: number): VizOutcome<Sta
       type: 'error',
       title: '栈满（overflow）',
       description: `top == STACK_CAP（${state.capacity}），数组没有空位了。顺序栈的固有限制：需要预先知道最大深度。`,
-      codeLine: 28,
+      codeLine: L.pushFull,
       variables: [intVar('s.top', state.frames.length)],
       memory: mem.snapshot(),
       mutate: (s) => {
@@ -179,7 +207,7 @@ export function arrayStackPush(state: StackState, value: number): VizOutcome<Sta
     title: `s->data[s->top] = ${value}（放在 top 指的空位）`,
     description: `元素 ${value} 压入下标 ${idx}。`,
     beginnerNote: `top 就是"下一个空位的下标"。放进去之后 top 还没动，所以要再看下一步。`,
-    codeLine: 31,
+    codeLine: L.pushWrite,
     variables: [intVar('s.top', idx), intVar('value', value)],
     memory: mem.snapshot(),
     highlight: [`f${idx}`],
@@ -192,7 +220,7 @@ export function arrayStackPush(state: StackState, value: number): VizOutcome<Sta
     type: 'assign',
     title: `s->top = ${idx + 1}（top 上移一格）`,
     description: `栈顶指针上移，${value} 成为新栈顶。push 完成，栈深度 ${idx + 1}。`,
-    codeLine: 32,
+    codeLine: L.pushTop,
     variables: [intVar('s.top', idx + 1)],
     memory: mem.snapshot(),
     highlight: [`f${idx}`],
@@ -209,7 +237,7 @@ export function arrayStackPop(state: StackState): VizOutcome<StackState> {
   const mem = stackMem(state);
 
   if (state.frames.length === 0) {
-    rec.fail('空栈下溢（underflow）', 'top == 0，栈里没有元素可弹出。写代码时必须先判空！', 38);
+    rec.fail('空栈下溢（underflow）', 'top == 0，栈里没有元素可弹出。写代码时必须先判空！', L.popEmpty);
     return rec.finish();
   }
 
@@ -219,7 +247,7 @@ export function arrayStackPop(state: StackState): VizOutcome<StackState> {
     type: 'assign',
     title: `s->top = ${idx}（top 先下移，指向栈顶元素）`,
     description: '出栈顺序与入栈相反：先把 top 降下来，栈顶元素才"露出来"。',
-    codeLine: 41,
+    codeLine: L.popTop,
     variables: [intVar('s.top', idx)],
     memory: mem.snapshot(),
     highlight: [`f${idx}`],
@@ -229,7 +257,7 @@ export function arrayStackPop(state: StackState): VizOutcome<StackState> {
     type: 'delete',
     title: `*out = s->data[s->top]，弹出 ${value}`,
     description: `读出下标 ${idx} 的值 ${value}，该格从此视为无效（下次 push 会覆盖它）。`,
-    codeLine: 42,
+    codeLine: L.popOut,
     variables: [otherVar('*out', value), intVar('s.top', idx)],
     memory: mem.snapshot(),
     highlight: [`f${idx}`],
@@ -245,7 +273,7 @@ export function arrayStackPeek(state: StackState): VizOutcome<StackState> {
   const rec = new StepRecorder<StackState>(state);
   const mem = stackMem(state);
   if (state.frames.length === 0) {
-    rec.fail('空栈', '栈为空，没有栈顶可看。', 49);
+    rec.fail('空栈', '栈为空，没有栈顶可看。', L.peekFn);
     return rec.finish();
   }
   const idx = state.frames.length - 1;
@@ -254,7 +282,7 @@ export function arrayStackPeek(state: StackState): VizOutcome<StackState> {
     type: 'visit',
     title: `*out = s->data[s->top - 1]，栈顶是 ${value}（top 不动）`,
     description: 'peek 只看不弹：top 保持不变，元素还在栈里。',
-    codeLine: 51,
+    codeLine: L.peekOut,
     variables: [otherVar('*out', value), intVar('s.top', idx + 1)],
     memory: mem.snapshot(),
     highlight: [`f${idx}`],
@@ -298,7 +326,7 @@ export function linkedStackFrom(values: number[]): VizOutcome<ListState> {
     type: 'create',
     title: `创建链栈（栈顶 → ${values.join(' → ')} → NULL）`,
     description: `链栈没有容量上限（受限于内存）。top 指向栈顶节点。`,
-    codeLine: 63,
+    codeLine: L.linkedPushMalloc,
     variables: [ptrVar('top', mem.addrOf(rec.state.nodes[0]?.id ?? ''), rec.state.nodes[0]?.id)],
     memory: mem.snapshot(),
     highlight: rec.state.nodes.map((n) => n.id),
@@ -319,7 +347,7 @@ export function linkedStackPush(state: ListState, value: number): VizOutcome<Lis
     type: 'create',
     title: `node = malloc(sizeof(StackNode))（${addr}）`,
     description: `新节点 data = ${value}。`,
-    codeLine: 63,
+    codeLine: L.linkedPushMalloc,
     variables: [ptrVar('node', addr, id), intVar('node->data', value)],
     memory: mem.snapshot(),
     highlight: [id],
@@ -335,7 +363,7 @@ export function linkedStackPush(state: ListState, value: number): VizOutcome<Lis
     type: 'assign',
     title: `node->next = top;（新节点指向原栈顶${oldTop === null ? ' NULL' : ''}）`,
     description: '新节点先接住原来的栈顶，成为它下面一层。',
-    codeLine: 67,
+    codeLine: L.linkedPushNext,
     variables: [ptrVar('node', addr, id), ptrVar('top', oldTop === null ? null : mem.addrOf(oldTop), oldTop)],
     memory: mem.snapshot(),
     highlight: [id, oldTop ?? ''].filter(Boolean),
@@ -349,7 +377,7 @@ export function linkedStackPush(state: ListState, value: number): VizOutcome<Lis
     type: 'insert',
     title: 'top = node;（新节点成为栈顶）',
     description: `top 改指新节点，${value} 成为新栈顶。`,
-    codeLine: 68,
+    codeLine: L.linkedPushTop,
     variables: [ptrVar('top', addr, id)],
     memory: mem.snapshot(),
     highlight: [id],
@@ -366,7 +394,7 @@ export function linkedStackPop(state: ListState): VizOutcome<ListState> {
   const mem = listStackMem(state);
 
   if (state.nodes.length === 0) {
-    rec.fail('空栈下溢', 'top == NULL，链栈为空，不能弹出。', 73);
+    rec.fail('空栈下溢', 'top == NULL，链栈为空，不能弹出。', L.linkedPopEmpty);
     return rec.finish();
   }
 
@@ -378,7 +406,7 @@ export function linkedStackPop(state: ListState): VizOutcome<ListState> {
     type: 'assign',
     title: `*out = node->data，取出栈顶 ${value}`,
     description: `栈顶节点（值 ${value}）的数据先读出来。`,
-    codeLine: 75,
+    codeLine: L.linkedPopOut,
     variables: [otherVar('*out', String(value)), ptrVar('top', mem.addrOf(topId), topId)],
     memory: mem.snapshot(),
     highlight: [topId],
@@ -388,7 +416,7 @@ export function linkedStackPop(state: ListState): VizOutcome<ListState> {
     type: 'move',
     title: `top = node->next;（栈顶下移到${nextId === null ? ' NULL' : `值 ${state.nodes[1]?.value} 的节点`}）`,
     description: 'top 指向原栈顶的下一个。',
-    codeLine: 76,
+    codeLine: L.linkedPopTop,
     variables: [ptrVar('top', nextId === null ? null : mem.addrOf(nextId), nextId)],
     memory: mem.snapshot(),
     highlight: [nextId ?? topId],
@@ -402,7 +430,7 @@ export function linkedStackPop(state: ListState): VizOutcome<ListState> {
     type: 'free',
     title: `free(node)（释放值 ${value} 的节点）`,
     description: '链栈弹出必须释放节点，否则每次 push/pop 都泄漏一个节点。',
-    codeLine: 77,
+    codeLine: L.linkedPopFree,
     memory: mem.snapshot(),
     highlight: [topId],
     mutate: (s) => {
@@ -451,7 +479,7 @@ export function bracketMatchDemo(input: string): {
     type: 'init',
     title: '扫描整个字符串，左括号入栈、右括号弹栈配对',
     description: `输入：${input === '' ? '（空串）' : input}`,
-    codeLine: 84,
+    codeLine: L.bracketFn,
     memory: mem.snapshot(),
   });
 
@@ -463,7 +491,7 @@ export function bracketMatchDemo(input: string): {
         type: 'insert',
         title: `${posDesc} 是左括号 → 入栈`,
         description: `'${c}' 压入栈顶等待未来配对。`,
-        codeLine: 89,
+        codeLine: L.bracketLeft,
         variables: [intVar('i', i), otherVar('c', `'${c}'`), intVar('st.top', idx + 1)],
         memory: mem.snapshot(),
         highlight: [`f${idx}`],
@@ -479,7 +507,7 @@ export function bracketMatchDemo(input: string): {
           type: 'error',
           title: `${posDesc} 是右括号，但栈是空的`,
           description: `${reason}。返回 0，匹配失败。`,
-          codeLine: 92,
+          codeLine: L.bracketEmpty,
           variables: [intVar('i', i)],
           memory: mem.snapshot(),
         });
@@ -494,7 +522,7 @@ export function bracketMatchDemo(input: string): {
         description: ok
           ? `'${left}' 与 '${c}' 是一对，消掉。`
           : `'${left}' 与 '${c}' 不是一对（类型不匹配），返回 0。`,
-        codeLine: 96,
+        codeLine: L.bracketPop,
         variables: [intVar('i', i), otherVar('left', `'${left}'`)],
         memory: mem.snapshot(),
         highlight: [`f${idx}`],
@@ -512,7 +540,7 @@ export function bracketMatchDemo(input: string): {
         type: 'info',
         title: `${posDesc} 不是括号，跳过`,
         description: '只处理三种括号字符。',
-        codeLine: 86,
+        codeLine: L.bracketFor,
         memory: mem.snapshot(),
       });
     }
@@ -525,7 +553,7 @@ export function bracketMatchDemo(input: string): {
       type: 'error',
       title: '字符串结束，栈非空',
       description: `${reason}。返回 0，匹配失败。`,
-      codeLine: 104,
+      codeLine: L.bracketEnd,
       memory: mem.snapshot(),
     });
   }
@@ -535,7 +563,7 @@ export function bracketMatchDemo(input: string): {
       type: 'info',
       title: '扫描结束且栈空：匹配成功',
       description: '每个左括号都找到了同类型的右括号，返回 1。',
-      codeLine: 104,
+      codeLine: L.bracketEnd,
       memory: mem.snapshot(),
     });
   }

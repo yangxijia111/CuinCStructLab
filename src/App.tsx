@@ -7,13 +7,13 @@ import {
   BankPage,
   CodingPage,
   HomePage,
-  LabPage,
   SearchPage,
   SettingsPage,
   StatsPage,
   StructuresPage,
   WrongBookPage,
 } from './pages/Placeholder';
+import { LabPage } from './pages/LabPage';
 
 export function App(): React.ReactElement {
   return (

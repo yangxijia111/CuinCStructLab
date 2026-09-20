@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder } from '../recorder';
 import type { CallFrame, TreeState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（Step.codeLine 指向这里，1-based） */
 export const TREE_C_CODE: string[] = [
@@ -90,6 +91,34 @@ export const TREE_C_CODE: string[] = [
   '}',
 ];
 
+const L = buildLineMap(TREE_C_CODE, {
+  newNodeMalloc: 'TreeNode *node = (TreeNode *)malloc(sizeof(TreeNode));',
+  preFn: 'void preorder(TreeNode *node) {',
+  preNull: 'if (node == NULL) {',
+  prePrint: '① 先访问根',
+  preLeft: '② 再递归左子树',
+  preRight: '③ 最后递归右子树',
+  inFn: 'void inorder(TreeNode *node) {',
+  inNull: 'if (node == NULL) {',
+  inLeft: '① 先走左',
+  inPrint: '② 输出根',
+  inRight: '③ 再走右',
+  postFn: 'void postorder(TreeNode *node) {',
+  postNull: 'if (node == NULL) {',
+  postLeft: 'postorder(node->left);',
+  postRight: 'postorder(node->right);',
+  postPrint: '③ 根',
+  levelFn: 'void levelOrder(TreeNode *root) {',
+  levelRoot: 'queue[rear++] = root;',
+  levelWhile: 'while (front < rear) {',
+  levelOut: 'TreeNode *node = queue[front++];',
+  levelPrint: 'printf("%d ", node->data);',
+  levelLeft: 'queue[rear++] = node->left;',
+  levelRight: 'queue[rear++] = node->right;',
+  destroyFn: 'void destroyTree(TreeNode *node) {',
+  destroyFree: 'free(node);',
+});
+
 /* ============ 构造 ============ */
 
 /** 从层序数组构建（null 表示空位；下标 i 的孩子是 2i+1 / 2i+2，教学用 0-based） */
@@ -123,7 +152,7 @@ export function treeFrom(values: Array<number | null>): VizOutcome<TreeState> {
     description: `共 ${Object.keys(rec.state.nodes).length} 个节点。每个节点含 data、left、right 三个域。`,
     beginnerNote:
       '二叉树的"左右"是有顺序的：left 必须挂在左边。空位用 NULL 表示，叶子节点左右都是 NULL。',
-    codeLine: 13,
+    codeLine: L.newNodeMalloc,
     memory: mem.snapshot(),
     highlight: Object.keys(rec.state.nodes),
   });
@@ -157,9 +186,11 @@ export function treeTraverse(state: TreeState, order: TraversalOrder): VizOutcom
   const orderName = order === 'preorder' ? '先序' : order === 'inorder' ? '中序' : '后序';
   const orderDesc =
     order === 'preorder' ? '根 → 左 → 右' : order === 'inorder' ? '左 → 根 → 右' : '左 → 右 → 根';
-  const entryLine = order === 'preorder' ? 24 : order === 'inorder' ? 34 : 44;
-  const nullLine = order === 'preorder' ? 25 : order === 'inorder' ? 35 : 46;
-  const visitLine = order === 'preorder' ? 28 : order === 'inorder' ? 39 : 50;
+  const entryLine = order === 'preorder' ? L.preFn : order === 'inorder' ? L.inFn : L.postFn;
+  const nullLine = order === 'preorder' ? L.preNull : order === 'inorder' ? L.inNull : L.postNull;
+  const visitLine = order === 'preorder' ? L.prePrint : order === 'inorder' ? L.inPrint : L.postPrint;
+  const leftLine = order === 'preorder' ? L.preLeft : order === 'inorder' ? L.inLeft : L.postLeft;
+  const rightLine = order === 'preorder' ? L.preRight : order === 'inorder' ? L.inRight : L.postRight;
 
   rec.record({
     type: 'init',
@@ -227,7 +258,7 @@ export function treeTraverse(state: TreeState, order: TraversalOrder): VizOutcom
           type: 'move',
           title: `${order}(node->left)${child === null ? '（NULL）' : `：进入左孩子 ${rec.state.nodes[child]?.value}`}`,
           description: `递归处理 ${node.value} 的左子树。`,
-          codeLine: order === 'preorder' ? 29 : order === 'inorder' ? 38 : 48,
+          codeLine: leftLine,
           memory: mem.snapshot(),
           callStack: [...stack],
           highlight: child === null ? [] : [child],
@@ -239,7 +270,7 @@ export function treeTraverse(state: TreeState, order: TraversalOrder): VizOutcom
           type: 'move',
           title: `${order}(node->right)${child === null ? '（NULL）' : `：进入右孩子 ${rec.state.nodes[child]?.value}`}`,
           description: `递归处理 ${node.value} 的右子树。`,
-          codeLine: order === 'preorder' ? 30 : order === 'inorder' ? 40 : 49,
+          codeLine: rightLine,
           memory: mem.snapshot(),
           callStack: [...stack],
           highlight: child === null ? [] : [child],
@@ -254,7 +285,7 @@ export function treeTraverse(state: TreeState, order: TraversalOrder): VizOutcom
       title: `${order}(${node.value}) 返回：弹出调用栈（深度 ${stack.length}）`,
       description: `以 ${node.value} 为根的子树处理完毕，回到调用者继续执行下一条语句。`,
       beginnerNote: '函数返回时，它那一帧自动出栈，回到调用者的下一条语句继续执行。递归"回升"的过程就是栈不断变矮的过程。',
-      codeLine: order === 'preorder' ? 30 : order === 'inorder' ? 40 : 49,
+      codeLine: rightLine,
       memory: mem.snapshot(),
       callStack: [...stack],
       highlight: [nodeId],
@@ -293,7 +324,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
     title: '开始层序遍历（借助队列，一层一层从左到右）',
     description: '层序遍历不是递归，而是用队列：根入队 → 出队访问 → 左右孩子入队 → 循环。',
     beginnerNote: '队列的 FIFO 特性正好保证"先遇到的先处理"，所以同一层的节点总是连续输出。',
-    codeLine: 54,
+    codeLine: L.levelFn,
     memory: mem.snapshot(),
     callStack: [],
     mutate: (s) => {
@@ -308,7 +339,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
       type: 'insert',
       title: 'queue[rear++] = root（根节点入队）',
       description: `根 ${rec.state.nodes[state.root]?.value} 入队。`,
-      codeLine: 60,
+      codeLine: L.levelRoot,
       memory: mem.snapshot(),
       highlight: [state.root],
       mutate: (s) => {
@@ -329,7 +360,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
       type: 'visit',
       title: `node = queue[front++]：出队并输出 ${node.value}`,
       description: `访问 ${node.value}。输出序列：${visitedNow.join(' ')}。队列：[${rest.map((id) => rec.state.nodes[id]?.value).join(', ')}]`,
-      codeLine: 62,
+      codeLine: L.levelOut,
       memory: mem.snapshot(),
       highlight: [nodeId],
       callStack: [],
@@ -348,7 +379,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
         type: 'insert',
         title: `queue[rear++] = node->left（${rec.state.nodes[node.left]?.value} 入队）`,
         description: `${node.value} 的左孩子 ${rec.state.nodes[node.left]?.value} 排到队尾。`,
-        codeLine: 65,
+        codeLine: L.levelLeft,
         memory: mem.snapshot(),
         highlight: [node.left],
         callStack: [],
@@ -363,7 +394,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
         type: 'insert',
         title: `queue[rear++] = node->right（${rec.state.nodes[node.right]?.value} 入队）`,
         description: `${node.value} 的右孩子 ${rec.state.nodes[node.right]?.value} 排到队尾。`,
-        codeLine: 68,
+        codeLine: L.levelRight,
         memory: mem.snapshot(),
         highlight: [node.right],
         callStack: [],
@@ -379,7 +410,7 @@ export function treeLevelOrder(state: TreeState): VizOutcome<TreeState> {
     type: 'info',
     title: 'front == rear：队列空，层序遍历结束',
     description: `完整输出：${(rec.state.visitValues ?? []).join(' ')}`,
-    codeLine: 61,
+    codeLine: L.levelWhile,
     memory: mem.snapshot(),
     callStack: [],
   });
@@ -402,7 +433,7 @@ export function treeDestroy(state: TreeState): VizOutcome<TreeState> {
       type: 'call',
       title: `destroyTree(${node.value})`,
       description: '后序销毁：必须先释放两个孩子，最后才能释放自己，否则孩子就找不到了。',
-      codeLine: 74,
+      codeLine: L.destroyFn,
       memory: mem.snapshot(),
       callStack: [...stack],
       highlight: [nodeId],
@@ -415,7 +446,7 @@ export function treeDestroy(state: TreeState): VizOutcome<TreeState> {
       type: 'free',
       title: `free(node)：释放 ${node.value}`,
       description: `左右子树已释放完毕，现在释放 ${node.value} 自己。`,
-      codeLine: 80,
+      codeLine: L.destroyFree,
       memory: mem.snapshot(),
       callStack: [...stack],
       highlight: [nodeId],
@@ -431,7 +462,7 @@ export function treeDestroy(state: TreeState): VizOutcome<TreeState> {
     type: 'info',
     title: '销毁完成',
     description: '全部节点已按后序释放，无泄漏。',
-    codeLine: 80,
+    codeLine: L.destroyFree,
     memory: mem.snapshot(),
     mutate: (s) => {
       s.root = null;

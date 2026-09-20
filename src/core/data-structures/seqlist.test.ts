@@ -71,8 +71,9 @@ describe('seqListInsert', () => {
     const out = seqListInsert(s, 1, 15);
     expect(out.ok).toBe(true);
     expect(seqListValues(finalState(out))).toEqual([10, 15, 20, 30]);
-    // 必须存在搬移步骤（codeLine 51）
-    expect(out.steps.some((st) => st.codeLine === 51)).toBe(true);
+    // 必须存在搬移步骤（映射到 L->data[i+1] = L->data[i] 那一行）
+    const moveLine = SEQ_LIST_C_CODE.findIndex((l) => l.includes('L->data[i + 1] = L->data[i]')) + 1;
+    expect(out.steps.some((st) => st.codeLine === moveLine)).toBe(true);
     // 最终 size=4
     expect(finalState(out).size).toBe(4);
   });

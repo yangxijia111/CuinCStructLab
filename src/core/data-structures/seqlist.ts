@@ -4,6 +4,7 @@
  */
 import { SimMem, StepRecorder, indexVar, intVar, otherVar, ptrVar, sizeVar } from '../recorder';
 import type { ArrayCell, ArrayState, Step, VizOutcome } from '../types';
+import { buildLineMap } from '../utils/code-lines';
 
 /** 教学 C 代码（行号从 1 开始，Step.codeLine 指向这里） */
 export const SEQ_LIST_C_CODE: string[] = [
@@ -112,6 +113,38 @@ export const SEQ_LIST_C_CODE: string[] = [
   '}',
 ];
 
+/** 关键行号表（按代码文本定位，杜绝硬编码漂移） */
+const L = buildLineMap(SEQ_LIST_C_CODE, {
+  initFn: 'int seqListInit(',
+  initMalloc: 'L->data = (int *)malloc(initCapacity',
+  initSize: 'L->size = 0;',
+  initCap: 'L->capacity = initCapacity;',
+  growMalloc: 'int *newData = (int *)malloc(newCap',
+  growMove: 'newData[i] = L->data[i];',
+  growFree: 'free(L->data);',
+  insertFn: 'int seqListInsert(',
+  insertRange: 'if (pos < 0 || pos > L->size)',
+  insertFull: 'if (L->size == L->capacity)',
+  insertMove: 'L->data[i + 1] = L->data[i];',
+  insertWrite: 'L->data[pos] = value;',
+  insertSize: 'L->size = L->size + 1;',
+  deleteFn: 'int seqListDelete(',
+  deleteRange: 'if (pos < 0 || pos >= L->size)',
+  deleteMove: 'L->data[i] = L->data[i + 1];',
+  deleteSize: 'L->size = L->size - 1;',
+  findFn: 'int seqListFind(',
+  findCmp: 'if (L->data[i] == value)',
+  findMiss: 'return -1;',
+  setFn: 'int seqListSet(',
+  setRange: 'if (pos < 0 || pos >= L->size)',
+  setWrite: 'L->data[pos] = value;',
+  traverseFn: 'void seqListTraverse(',
+  traversePrint: 'printf("%d ", L->data[i]);',
+  destroyFn: 'void seqListDestroy(',
+  destroyFree: 'free(L->data);',
+  destroyNull: 'L->data = NULL;',
+});
+
 /** 从终态提取纯值序列（测试与断言用） */
 export function seqListValues(state: ArrayState): number[] {
   return state.cells.slice(0, state.size).map((c) => c.value ?? 0);
@@ -145,7 +178,7 @@ export function seqListFrom(values: number[], capacity?: number): VizOutcome<Arr
     description: `malloc 了容量为 ${cap} 的 int 数组，L.data 指向它，size = ${values.length}。`,
     beginnerNote:
       '顺序表 = 一块连续内存 + 记录长度的 size。data 是指针，保存数组第一个格子的地址；访问 L.data[i] 就是"从起点向后数 i 格"。',
-    codeLine: 13,
+    codeLine: L.initMalloc,
     variables: [ptrVar('L.data', '0x8000', 'arr'), sizeVar('L.size', values.length), intVar('L.capacity', cap)],
     memory: mem.snapshot(),
     highlight: values.map((_, i) => `a${i}`),
@@ -178,7 +211,7 @@ export function seqListInit(initCapacity = 4): VizOutcome<ArrayState> {
     type: 'init',
     title: '定义 SeqList L（此时 data 还是野的 NULL）',
     description: '栈上定义结构体变量 L，三个成员尚未赋值，先把 data 置为 NULL 表示"还没有数组"。',
-    codeLine: 12,
+    codeLine: L.initFn,
     variables: [ptrVar('L.data', null), sizeVar('L.size', 0), intVar('L.capacity', 0)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -194,7 +227,7 @@ export function seqListInit(initCapacity = 4): VizOutcome<ArrayState> {
     description: `向系统申请能装 ${initCapacity} 个 int 的连续内存，起始地址 ${arrAddr}（模拟地址）赋给 L.data。`,
     beginnerNote:
       'malloc 的参数是"字节数"：initCapacity * sizeof(int) 才是正确写法。返回值是 void* 指针，C 中赋给 int* 无需强转，但必须检查是否为 NULL。',
-    codeLine: 13,
+    codeLine: L.initMalloc,
     variables: [ptrVar('L.data', arrAddr, 'arr'), sizeVar('L.size', 0), intVar('L.capacity', initCapacity)],
     memory: mem.snapshot(),
     highlight: ['arr'],
@@ -209,7 +242,7 @@ export function seqListInit(initCapacity = 4): VizOutcome<ArrayState> {
     type: 'assign',
     title: 'L.size = 0; L.capacity = initCapacity;',
     description: '记录当前元素个数与容量，初始化完成。',
-    codeLine: 17,
+    codeLine: L.initSize,
     variables: [ptrVar('L.data', arrAddr, 'arr'), sizeVar('L.size', 0), intVar('L.capacity', initCapacity)],
     memory: mem.snapshot(),
   });
@@ -231,7 +264,7 @@ function grow(rec: StepRecorder<ArrayState>, mem: SimMem): void {
     description: `旧容量 ${oldCap} 已装满。申请一块两倍大的新内存 ${newArrAddr}（模拟地址），接下来要把旧数据搬过去。`,
     beginnerNote:
       '动态数组无法"原地变大"，因为旁边的内存可能被占用。唯一办法：申请新的大数组 → 复制 → 释放旧的。这就是 vector 扩容的本质。',
-    codeLine: 25,
+    codeLine: L.growMalloc,
     variables: [intVar('newCap', newCap), ptrVar('newData', newArrAddr, 'arrNew'), ptrVar('L.data', oldAddr, 'arr')],
     memory: mem.snapshot(),
     highlight: ['arrNew'],
@@ -251,7 +284,7 @@ function grow(rec: StepRecorder<ArrayState>, mem: SimMem): void {
     type: 'move',
     title: '逐个搬移旧数据到新数组',
     description: `for 循环把 ${state.size} 个元素依次复制：newData[i] = data[i]。`,
-    codeLine: 30,
+    codeLine: L.growMove,
     variables: [ptrVar('newData', newArrAddr, 'arrNew'), ptrVar('L.data', oldAddr, 'arr'), indexVar('i', 0)],
     memory: mem.snapshot(),
     highlight: Array.from({ length: state.size }, (_, i) => `a${i}`),
@@ -264,7 +297,7 @@ function grow(rec: StepRecorder<ArrayState>, mem: SimMem): void {
     type: 'free',
     title: `free(L->data) 释放旧数组 ${oldAddr}，再让 L.data 指向新数组`,
     description: `旧数组 ${oldAddr} 已无用，必须 free 归还系统（否则内存泄漏）；然后 L.data = newData。`,
-    codeLine: 32,
+    codeLine: L.growFree,
     variables: [ptrVar('L.data', newArrAddr, 'arrNew'), intVar('L.capacity', newCap)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -282,7 +315,7 @@ export function seqListInsert(state: ArrayState, pos: number, value: number): Vi
     rec.fail(
       '下标越界',
       `插入位置 pos = ${pos} 不合法：必须满足 0 <= pos <= size（当前 size = ${state.size}）。`,
-      41,
+      L.insertRange,
     );
     return rec.finish();
   }
@@ -291,7 +324,7 @@ export function seqListInsert(state: ArrayState, pos: number, value: number): Vi
     type: 'info',
     title: `检查参数：pos = ${pos}，value = ${value}`,
     description: `pos 在合法范围 [0, ${state.size}] 内，可以插入。`,
-    codeLine: 40,
+    codeLine: L.insertFn,
     variables: [indexVar('pos', pos), intVar('value', value), sizeVar('L.size', state.size)],
     memory: mem.snapshot(),
     highlight: [`a${pos}`],
@@ -309,7 +342,7 @@ export function seqListInsert(state: ArrayState, pos: number, value: number): Vi
       title: `L->data[${i + 1}] = L->data[${i}]（把 ${moved} 后移一格）`,
       description: `从后往前挪：先把下标 ${i} 的 ${moved} 复制到 ${i + 1}，为 pos = ${pos} 腾位置。从后往前是为了不覆盖还没搬的数据。`,
       beginnerNote: `如果从前往后挪，data[pos+1] 会先被覆盖，导致后面的数据丢失。从后往前：每次写的位置 [i+1] 一定已经"搬走"了。`,
-      codeLine: 51,
+      codeLine: L.insertMove,
       variables: [indexVar('i', i), indexVar('pos', pos), sizeVar('L.size', st1.size)],
       memory: mem.snapshot(),
       highlight: [`a${i}`, `a${i + 1}`],
@@ -329,7 +362,7 @@ export function seqListInsert(state: ArrayState, pos: number, value: number): Vi
       displaced === null
         ? `在空位 pos = ${pos} 写入 ${value}。`
         : `把 ${value} 写进腾出的 pos = ${pos}（原值 ${displaced} 已后移）。`,
-    codeLine: 52,
+    codeLine: L.insertWrite,
     variables: [indexVar('pos', pos), intVar('value', value)],
     memory: mem.snapshot(),
     highlight: [`a${pos}`],
@@ -343,7 +376,7 @@ export function seqListInsert(state: ArrayState, pos: number, value: number): Vi
     type: 'insert',
     title: `L->size = ${rec.state.size + 1}，插入完成`,
     description: `元素个数 +1，当前顺序表内容：[${seqListValues(rec.state).join(', ')}]。`,
-    codeLine: 53,
+    codeLine: L.insertSize,
     variables: [sizeVar('L.size', rec.state.size + 1)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -370,7 +403,7 @@ export function seqListDelete(state: ArrayState, pos: number): VizOutcome<ArrayS
     type: 'info',
     title: `检查参数：pos = ${pos} 合法，将删除 ${removed}`,
     description: `被删除的是下标 ${pos} 的值 ${removed}。`,
-    codeLine: 59,
+    codeLine: L.deleteFn,
     variables: [indexVar('pos', pos), sizeVar('L.size', state.size)],
     memory: mem.snapshot(),
     highlight: [`a${pos}`],
@@ -383,7 +416,7 @@ export function seqListDelete(state: ArrayState, pos: number): VizOutcome<ArrayS
       type: 'assign',
       title: `L->data[${i}] = L->data[${i + 1}]（把 ${moved} 前移一格）`,
       description: `从前往后挪：用后面的 ${moved} 覆盖前面的位置 ${i}，被删元素逐渐被"抹掉"。`,
-      codeLine: 64,
+      codeLine: L.deleteMove,
       variables: [indexVar('i', i), sizeVar('L.size', st.size)],
       memory: mem.snapshot(),
       highlight: [`a${i}`, `a${i + 1}`],
@@ -398,7 +431,7 @@ export function seqListDelete(state: ArrayState, pos: number): VizOutcome<ArrayS
     type: 'delete',
     title: `L->size = ${rec.state.size - 1}，删除完成`,
     description: `元素个数 -1。注意：最后一格的旧值还留在内存里，但 size 之外不算有效数据（这格将来会被覆盖）。当前内容：[${seqListValues(rec.state).join(', ')}]。`,
-    codeLine: 66,
+    codeLine: L.deleteSize,
     variables: [sizeVar('L.size', rec.state.size - 1)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -424,7 +457,7 @@ export function seqListFind(state: ArrayState, value: number): VizOutcome<ArrayS
       type: hit ? 'visit' : 'compare',
       title: `比较 L->data[${i}]（${cur}）== ${value} ？${hit ? '相等！' : '不相等'}`,
       description: hit ? `在下标 ${i} 找到了 ${value}，返回下标。` : `下标 ${i} 是 ${cur}，不是目标，继续往后找。`,
-      codeLine: 73,
+      codeLine: L.findCmp,
       variables: [indexVar('i', i), intVar('value', value)],
       memory: mem.snapshot(),
       highlight: [`a${i}`],
@@ -441,7 +474,7 @@ export function seqListFind(state: ArrayState, value: number): VizOutcome<ArrayS
       type: 'info',
       title: `没找到 ${value}，返回 -1`,
       description: `从头到尾比较了 ${state.size} 次，都不等于目标值，返回 -1 表示不存在。`,
-      codeLine: 77,
+      codeLine: L.findMiss,
       variables: [intVar('value', value), otherVar('返回值', '-1')],
       memory: mem.snapshot(),
       metrics: { comparisons: state.size, swaps: 0 },
@@ -470,7 +503,7 @@ export function seqListSet(state: ArrayState, pos: number, value: number): VizOu
     title: `L->data[${pos}]：${old} → ${value}`,
     description: `直接通过下标定位（顺序表随机访问 O(1)），把 ${old} 改成 ${value}。`,
     beginnerNote: `L->data[pos] 的含义：data 保存首地址，pos × sizeof(int) 就是偏移量，一步算出目标格子地址——这就是"随机访问"。`,
-    codeLine: 85,
+    codeLine: L.setWrite,
     variables: [indexVar('pos', pos), intVar('value', value)],
     memory: mem.snapshot(),
     highlight: [`a${pos}`],
@@ -484,7 +517,7 @@ export function seqListSet(state: ArrayState, pos: number, value: number): VizOu
     type: 'info',
     title: '修改完成',
     description: `当前内容：[${seqListValues(rec.state).join(', ')}]。`,
-    codeLine: 86,
+    codeLine: L.setFn,
     memory: mem.snapshot(),
     mutate: (s) => {
       for (const c of s.cells) c.flags = [];
@@ -507,7 +540,7 @@ export function seqListTraverse(state: ArrayState): VizOutcome<ArrayState> {
       type: 'visit',
       title: `printf("%d ", L->data[${i}]) 输出 ${v}`,
       description: `访问下标 ${i}，已输出：${seen.join(' ')}`,
-      codeLine: 92,
+      codeLine: L.traversePrint,
       variables: [indexVar('i', i)],
       memory: mem.snapshot(),
       highlight: [`a${i}`],
@@ -534,7 +567,7 @@ export function seqListDestroy(state: ArrayState): VizOutcome<ArrayState> {
     title: `free(L->data)：释放堆数组 ${addr ?? ''}`,
     description: '顺序表用完必须释放 malloc 的数组，否则内存泄漏。释放后 data 变成悬垂指针，所以要紧接着置 NULL。',
     beginnerNote: 'free 之后指针变量里还留着旧地址（悬垂指针），再解引用是未定义行为。养成 free 后立刻置 NULL 的习惯。',
-    codeLine: 99,
+    codeLine: L.destroyFree,
     variables: [ptrVar('L.data', null), sizeVar('L.size', state.size)],
     memory: mem.snapshot(),
     mutate: (s) => {
@@ -549,7 +582,7 @@ export function seqListDestroy(state: ArrayState): VizOutcome<ArrayState> {
     type: 'assign',
     title: 'L->data = NULL; L->size = 0; L->capacity = 0;',
     description: '把结构体恢复到空状态，销毁完成。',
-    codeLine: 100,
+    codeLine: L.destroyNull,
     memory: mem.snapshot(),
     mutate: (s) => {
       s.size = 0;
