@@ -18,7 +18,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; icon: string }> = [
 ];
 
 export function AppLayout(): React.ReactElement {
-  const { theme, setTheme, beginnerMode, setBeginnerMode } = useAppStore();
+  const { theme, setTheme, beginnerMode, setBeginnerMode, storageError } = useAppStore();
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -70,6 +70,12 @@ export function AppLayout(): React.ReactElement {
             </button>
           </div>
         </header>
+        {storageError !== null && (
+          <div className="storage-error-banner" role="alert">
+            ⚠ {storageError}
+            <button type="button" className="banner-close" aria-label="关闭" onClick={() => undefined}>×</button>
+          </div>
+        )}
         <main className="content">
           <Outlet />
         </main>

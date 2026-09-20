@@ -65,7 +65,7 @@
 - **验收**：题库完整性测试 + 判分矩阵测试 + 答题交互冒烟。
 - **完成标准**：FR-EXE-01..05、FR-WRONG-01..03（逻辑层）。
 
-## P9 本地存储层 ⬜
+## P9 本地存储层 ✅
 - **目标**：SQLite（sql.js）+ migration + 全部仓库 + 接线。
 - **功能**：DB 单例、schema v1、migrations、防抖持久化（IndexedDB/Electron 文件）、全部 Repo、进度/错题/笔记/收藏/设置/学习日活落库、JSON 导出导入。
 - **验收**：CRUD/migration/掌握度/连续天数测试；刷新后数据仍在（jsdom + fake-indexeddb 集成）。

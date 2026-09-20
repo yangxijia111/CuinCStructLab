@@ -1769,3 +1769,24 @@ button {
   color: var(--text-dim);
   font-size: 12px;
 }
+
+/* ============ 存储错误横幅 ============ */
+.storage-error-banner {
+  background: rgba(224, 86, 79, 0.15);
+  border-bottom: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 8px 18px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.banner-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-size: 16px;
+  cursor: pointer;
+}
