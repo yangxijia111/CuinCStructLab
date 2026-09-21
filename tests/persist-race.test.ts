@@ -33,6 +33,7 @@ class BlockingBackend implements PersistenceBackend {
     this.snapshots.length = 0;
     this.block = true;
     this.release = null;
+    await Promise.resolve();
   }
 
   releaseFirst(): void {

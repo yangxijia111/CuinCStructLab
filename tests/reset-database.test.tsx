@@ -120,7 +120,7 @@ describe('设置页清空数据（UI 二次确认 + 状态复位）', () => {
 
     // 拦截 reload（jsdom 未实现）
     const reloadSpy = vi.fn();
-    vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
+    vi.stubGlobal('location', { reload: reloadSpy });
 
     fireEvent.click(screen.getByRole('button', { name: '确认清空全部数据' }));
     await waitFor(() => expect(screen.getByText(/数据已清空/)).toBeDefined(), { timeout: 8000 });

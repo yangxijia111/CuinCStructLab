@@ -101,6 +101,7 @@ export class MemoryBackend implements PersistenceBackend {
   }
   async reset(): Promise<void> {
     this.data = null;
+    await Promise.resolve();
   }
 }
 
