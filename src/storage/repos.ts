@@ -35,7 +35,9 @@ export function saveChapterVisit(db: AppDatabase, chapter: number, sectionIndex:
     `INSERT INTO chapter_progress(chapter, status, lastVisitAt, visitCount, maxSectionIndex)
      VALUES(?, 'learning', ?, 1, ?)
      ON CONFLICT(chapter) DO UPDATE SET
-       status = 'learning', lastVisitAt = excluded.lastVisitAt, visitCount = visitCount + 1,
+       -- done 是单调终态：已完成章节复习时不得降级（new → learning → done 单向）
+       status = CASE WHEN chapter_progress.status = 'done' THEN 'done' ELSE 'learning' END,
+       lastVisitAt = excluded.lastVisitAt, visitCount = visitCount + 1,
        maxSectionIndex = MAX(maxSectionIndex, excluded.maxSectionIndex)`,
     [chapter, now, sectionIndex],
   );

@@ -184,7 +184,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
         return {
           ...prev,
           [chapter]: {
-            status: 'learning',
+            // done 是单调终态：已完成章节复习时不得降级（new → learning → done 单向）
+            status: cur?.status === 'done' ? 'done' : 'learning',
             lastVisitAt: Date.now(),
             visitCount: (cur?.visitCount ?? 0) + 1,
             maxSectionIndex: Math.max(cur?.maxSectionIndex ?? 0, sectionIndex),
