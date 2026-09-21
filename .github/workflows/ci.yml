@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Verify (Node ${{ matrix.node }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [20, 22]
+        include:
+          # Windows 冒烟：核心验证 + 构建在 Windows 侧再跑一遍
+          - os: windows-latest
+            node: 22
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit & integration tests
+        run: npm run test
+
+      # coverage threshold（85/80/85/85）在 vite.config.ts 定义，未达标即失败
+      - name: Coverage (threshold-enforced)
+        run: npm run coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Electron smoke (production build via app:// protocol)
+        run: npm run electron:smoke
+        # 冒烟需要无头显示环境
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
+
+  gcc-runner:
+    name: GCC runner integration (all coding problems)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure gcc is available (hard requirement for this job)
+        run: |
+          gcc --version
+          test -x "$(command -v gcc)"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # gcc 集成测试在 PATH 有 gcc 时全量执行：全部 10 题 referenceSolution
+      # 必须编译运行全部用例 Accepted，另覆盖 WA/CE/RE/TLE/输出洪泛/Unicode/清理
+      - name: Real gcc integration tests
+        run: npx vitest run tests/gcc-integration.test.ts
+
+  package:
+    name: Windows package (electron-builder)
+    runs-on: windows-latest
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package (NSIS installer + portable, x64)
+        run: npm run electron:build
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-packages
+          path: |
+            release/*.exe
+          if-no-files-found: error
+          retention-days: 14

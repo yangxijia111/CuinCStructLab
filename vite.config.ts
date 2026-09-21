@@ -1,11 +1,33 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+
+/** 生产构建向 index.html 注入 CSP meta（app:// 桌面端另有响应头 CSP；本插件保障 Web 部署） */
+function cspInject(): Plugin {
+  return {
+    name: 'csp-inject',
+    apply: 'build',
+    transformIndexHtml(html) {
+      const csp = [
+        "default-src 'self' file:",
+        "script-src 'self' file:",
+        "style-src 'self' file: 'unsafe-inline'",
+        "img-src 'self' file: data:",
+        "font-src 'self' file: data:",
+        "connect-src 'self' file:",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+      ].join('; ');
+      return html.replace('</title>', `</title>\n    <meta http-equiv="Content-Security-Policy" content="${csp}">`);
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(), cspInject()],
   build: {
     chunkSizeWarningLimit: 1600,
   },

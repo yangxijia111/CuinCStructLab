@@ -130,6 +130,8 @@ describe('审计：排序边界（含大数组一致性）', () => {
 
 describe('审计：性能指标（NFR-05）', () => {
   it('64 元素排序步骤生成：单算法 < 200ms（交互响应指标；多次取样取最小值以抗并行负载抖动）', () => {
+    // coverage 插桩会让 JS 恒定变慢 ~2x，插桩运行（npm run coverage）放宽到 500ms；阈值语义不变
+    const threshold = process.env.COVERAGE_RUN === '1' ? 500 : 200;
     const rnd = seededRandom(7);
     const arr = Array.from({ length: 64 }, () => Math.floor(rnd() * 100));
     for (const id of ['quick', 'merge', 'heap', 'bubble'] as const) {
@@ -140,7 +142,7 @@ describe('审计：性能指标（NFR-05）', () => {
         sortWithSteps(id, arr);
         best = Math.min(best, performance.now() - t0);
       }
-      expect(best, `${id} 生成耗时 ${best}ms`).toBeLessThan(200);
+      expect(best, `${id} 生成耗时 ${best}ms`).toBeLessThan(threshold);
     }
   });
 

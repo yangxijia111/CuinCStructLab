@@ -1,7 +1,7 @@
 {
   "name": "cuincstructlab",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "CuinCStructLab — 面向 C 语言初学者的数据结构学习、可视化、代码实践与刷题平台",
   "type": "module",
   "scripts": {
@@ -12,10 +12,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
+    "coverage": "cross-env COVERAGE_RUN=1 vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "electron:dev": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.cjs",
-    "electron:build": "echo \"Electron 外壳为可选增强，见 docs/ARCHITECTURE.md §1.2（P12 提供）\"",
+    "electron:build": "npm run build && electron-builder --win --x64",
     "electron:start": "electron electron/main.cjs",
     "electron:smoke": "electron electron/smoke.cjs"
   },
@@ -39,6 +39,7 @@
     "@vitest/coverage-v8": "^5.0.1",
     "cross-env": "^10.1.0",
     "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
@@ -50,5 +51,37 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
   },
-  "main": "electron/main.cjs"
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.cuincstructlab.app",
+    "productName": "CuinCStructLab",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "CuinCStructLab-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "CuinCStructLab-Portable-${version}.${ext}"
+    }
+  }
 }
