@@ -19,6 +19,8 @@ export class AppDatabase {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   /** 是否有未落盘修改 */
   private dirty = false;
+  /** 实例是否已关闭（关闭后挂起的防抖 timer 不得再触发 flush） */
+  private closed = false;
   /** 写操作版本号：flush 据此判断保存期间是否又发生了新写入 */
   private revision = 0;
   /** flush 串行链：并发 flush 调用排队执行，杜绝交错保存 */
@@ -146,6 +148,7 @@ export class AppDatabase {
    *   循环继续保存 —— 绝不丢失最后一次修改（P14 P0-4）。
    */
   async flush(): Promise<void> {
+    if (this.closed) return;
     const run = this.flushChain.then(async () => {
       while (this.dirty) {
         const snapshotRev = this.revision;
@@ -188,6 +191,12 @@ export class AppDatabase {
   }
 
   close(): void {
+    this.closed = true;
+    this.dirty = false;
+    if (this.persistTimer !== null) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
     this.db.close();
     this.backend.close?.();
   }
@@ -195,11 +204,35 @@ export class AppDatabase {
 
 /** 应用级单例（由 AppStore 在启动时初始化） */
 let singleton: AppDatabase | null = null;
+/** 进行中的 open（并发 getDb() 复用同一 promise，杜绝双开实例） */
+let opening: Promise<AppDatabase> | null = null;
 
 export async function getDb(): Promise<AppDatabase> {
-  if (singleton === null) {
-    singleton = await AppDatabase.open();
+  if (singleton !== null) return singleton;
+  if (opening === null) {
+    opening = AppDatabase.open().then((db) => {
+      singleton = db;
+      opening = null;
+      return db;
+    });
   }
+  return opening;
+}
+
+/**
+ * 清空全部数据并重建数据库（设置页「清空全部数据」统一入口）。
+ * 流程：关闭当前 sql.js 实例与底层连接 → backend.reset() 删除底层数据
+ * （Web：IndexedDB 库；Electron：userData/cuincstructlab.db）→ 重新 open + migrate。
+ */
+export async function resetDatabase(deps?: Partial<AppDatabaseDeps>): Promise<AppDatabase> {
+  if (singleton !== null) {
+    singleton.close();
+    singleton = null;
+  }
+  opening = null;
+  const backend = deps?.backend ?? (await import('./backend')).defaultBackend();
+  await backend.reset();
+  singleton = await AppDatabase.open({ ...deps, backend });
   return singleton;
 }
 

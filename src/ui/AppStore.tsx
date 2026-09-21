@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import type { Exercise } from '../exercises/types';
 import type { AppDatabase } from '../storage/db';
-import { getDb } from '../storage/db';
+import { getDb, resetDatabase } from '../storage/db';
 import * as repos from '../storage/repos';
 import type { ChapterProgressRow, TargetType } from '../storage/repos';
 
@@ -63,6 +63,8 @@ export interface AppStoreValue {
   isFavorite(targetType: TargetType, targetId: string): boolean;
   /** 导出全部学习数据（JSON 字符串） */
   exportData(): Promise<string>;
+  /** 清空全部数据（关闭并删除底层数据库 + 重置内存态，二次确认在 UI 层） */
+  resetAllData(): Promise<void>;
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
@@ -303,6 +305,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
     return db.exportJson();
   }, []);
 
+  /** 清空全部数据：删除底层数据库（Web/Electron 统一走 backend.reset）+ 全部内存态复位 */
+  const resetAllData = useCallback(async (): Promise<void> => {
+    await resetDatabase();
+    setProgress({});
+    setAttempts([]);
+    setWrongBook({});
+    setNotes({});
+    setFavorites([]);
+    setThemeState('dark');
+    document.documentElement.dataset.theme = 'dark';
+    setBeginnerModeState(false);
+    setStorageError(null);
+  }, []);
+
   const value = useMemo<AppStoreValue>(
     () => ({
       storageReady,
@@ -324,6 +340,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       toggleFavorite,
       isFavorite,
       exportData,
+      resetAllData,
     }),
     [
       storageReady,
@@ -345,6 +362,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       toggleFavorite,
       isFavorite,
       exportData,
+      resetAllData,
     ],
   );
 

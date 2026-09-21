@@ -7,7 +7,7 @@ import { detectCompilers } from '../runner/runner';
 import type { RunnerAvailability } from '../runner/runner';
 
 export function SettingsPage(): React.ReactElement {
-  const { theme, setTheme, beginnerMode, setBeginnerMode, exportData, storageError } = useAppStore();
+  const { theme, setTheme, beginnerMode, setBeginnerMode, exportData, resetAllData, storageError } = useAppStore();
   const [compilerPath, setCompilerPath] = useState('');
   const [availability, setAvailability] = useState<RunnerAvailability | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -36,17 +36,17 @@ export function SettingsPage(): React.ReactElement {
   };
 
   const doClear = async (): Promise<void> => {
-    // 删除 IndexedDB 中的数据库（下次启动重建空库）
-    await new Promise<void>((resolve) => {
-      const req = indexedDB.deleteDatabase('cclab');
-      req.onsuccess = (): void => resolve();
-      req.onerror = (): void => resolve();
-      req.onblocked = (): void => resolve();
-    });
-    setMessage('数据已清空。页面即将刷新…');
-    setTimeout(() => {
-      window.location.reload();
-    }, 1200);
+    // 统一 API：关闭并删除底层数据库（Web: IndexedDB；桌面: userData 文件）+ 重置内存态
+    try {
+      await resetAllData();
+      setMessage('数据已清空。页面即将刷新…');
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } catch (err) {
+      setMessage(`清空失败：${err instanceof Error ? err.message : String(err)}`);
+      setConfirmClear(false);
+    }
   };
 
   return (

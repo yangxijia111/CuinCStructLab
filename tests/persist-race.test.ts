@@ -29,6 +29,12 @@ class BlockingBackend implements PersistenceBackend {
     return Promise.resolve();
   }
 
+  async reset(): Promise<void> {
+    this.snapshots.length = 0;
+    this.block = true;
+    this.release = null;
+  }
+
   releaseFirst(): void {
     this.release?.();
     this.release = null;

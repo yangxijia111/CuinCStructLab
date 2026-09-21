@@ -71,6 +71,9 @@ class MemoryBackendPassthrough implements PersistenceBackend {
   save(): Promise<void> {
     return Promise.resolve();
   }
+  async reset(): Promise<void> {
+    // 测试后端无可删底层介质
+  }
 }
 
 describe('CRUD', () => {
