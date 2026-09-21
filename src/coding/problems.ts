@@ -252,7 +252,11 @@ int stackPush(ArrayStack *s, int value) {
 `,
     testCases: [
       { stdin: '3\n1 2 3\n', expected: '1 2 3' },
-      { stdin: '10\n1 2 3 4 5 6 7 8 9 0\n', expected: '1 2 3 4 5 6 7 8', explanation: '第 9 个 push 溢出被忽略；0 触发 pop 移除 8？不——pop 移除栈顶 8，剩 1..7？请以实现为准：本题期望 1 2 3 4 5 6 7' },
+      {
+        stdin: '10\n1 2 3 4 5 6 7 8 9 0\n',
+        expected: '1 2 3 4 5 6 7',
+        explanation: 'STACK_CAP=8：1~8 依次入栈成功；第 9 个 push（值 9）栈满被忽略；0 触发一次 pop 弹出栈顶 8，剩 1..7',
+      },
       { stdin: '2\n5 0\n', expected: '' },
     ],
     referenceSolution: `int stackPush(ArrayStack *s, int value) {
