@@ -17,8 +17,12 @@ export class AppDatabase {
   private readonly db: Database;
   private readonly backend: PersistenceBackend;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
-  private persisting = false;
+  /** 是否有未落盘修改 */
   private dirty = false;
+  /** 写操作版本号：flush 据此判断保存期间是否又发生了新写入 */
+  private revision = 0;
+  /** flush 串行链：并发 flush 调用排队执行，杜绝交错保存 */
+  private flushChain: Promise<void> = Promise.resolve();
 
   private constructor(db: Database, backend: PersistenceBackend) {
     this.db = db;
@@ -79,6 +83,7 @@ export class AppDatabase {
   /** 执行写语句 */
   run(sql: string, params: SqlParam[] = []): void {
     this.db.run(sql, params);
+    this.markDirty();
     void this.schedulePersist();
   }
 
@@ -107,6 +112,7 @@ export class AppDatabase {
       this.db.run('ROLLBACK');
       throw err;
     }
+    this.markDirty();
     void this.schedulePersist();
   }
 
@@ -115,27 +121,44 @@ export class AppDatabase {
     return this.db.export();
   }
 
+  /** 标记脏数据（每次写操作递增版本号，供 flush 判断竞态窗口） */
+  private markDirty(): void {
+    this.revision += 1;
+    this.dirty = true;
+  }
+
   /** 防抖持久化（500ms） */
   async schedulePersist(): Promise<void> {
     this.dirty = true;
     if (this.persistTimer !== null) clearTimeout(this.persistTimer);
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.persistTimer = setTimeout(() => {
-        void this.flush().then(() => resolve());
+        this.persistTimer = null;
+        this.flush().then(resolve, reject);
       }, 500);
     });
   }
 
-  /** 立即持久化 */
+  /**
+   * 立即持久化（竞态安全）：
+   * - 并发调用经 flushChain 串行化；
+   * - while-dirty 循环：保存期间若发生新写入（revision 变化），dirty 保持 true，
+   *   循环继续保存 —— 绝不丢失最后一次修改（P14 P0-4）。
+   */
   async flush(): Promise<void> {
-    if (this.persisting || !this.dirty) return;
-    this.persisting = true;
-    try {
-      await this.backend.save(this.exportBytes());
-      this.dirty = false;
-    } finally {
-      this.persisting = false;
-    }
+    const run = this.flushChain.then(async () => {
+      while (this.dirty) {
+        const snapshotRev = this.revision;
+        await this.backend.save(this.exportBytes());
+        // 仅当保存期间没有新写入时才清除 dirty
+        if (this.revision === snapshotRev) this.dirty = false;
+      }
+    });
+    this.flushChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   /** 全量 JSON 导出（备份兜底，FR-DATA-04） */
