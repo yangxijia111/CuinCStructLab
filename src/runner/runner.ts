@@ -109,6 +109,29 @@ export async function detectCompilers(customPath?: string): Promise<RunnerAvaila
 }
 
 /**
+ * 探测（带回退）：自定义路径优先；路径失效时自动回退 PATH 探测，
+ * 并在 reason 中明确提示已回退（P14 编译器设置链路）。
+ */
+export async function detectCompilersWithFallback(customPath?: string): Promise<RunnerAvailability> {
+  const trimmed = customPath?.trim();
+  const primary = await detectCompilers(trimmed === '' ? undefined : trimmed);
+  if (primary.available || trimmed === undefined || trimmed === '') {
+    return primary;
+  }
+  const fallback = await detectCompilers(undefined);
+  if (fallback.available) {
+    return {
+      ...fallback,
+      reason: `自定义路径不可用（${primary.reason}），已自动回退 PATH 探测。`,
+    };
+  }
+  return {
+    ...primary,
+    reason: `${primary.reason}；PATH 中也未探测到可用编译器：${fallback.reason}`,
+  };
+}
+
+/**
  * 编译并逐用例运行（判题主入口）。
  * harness：平台提供的判题 main（读取 stdin、调用用户函数、打印结果）。
  */

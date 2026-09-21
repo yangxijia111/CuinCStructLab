@@ -10,13 +10,13 @@ import * as repos from '../src/storage/repos';
 // fake-indexeddb 在 setup.ts 全局注入
 
 async function reopen(): Promise<AppDatabase> {
-  resetDbSingleton();
+  await resetDbSingleton();
   return AppDatabase.open({ backend: new IndexedDbBackend() });
 }
 
 beforeEach(async () => {
   // 清空 IndexedDB
-  resetDbSingleton();
+  await resetDbSingleton();
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('cclab');
     req.onsuccess = (): void => resolve();

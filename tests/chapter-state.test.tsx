@@ -13,12 +13,12 @@ import { AppStoreProvider, useAppStore } from '../src/ui/AppStore';
 // fake-indexeddb 在 setup.ts 全局注入
 
 async function reopen(): Promise<AppDatabase> {
-  resetDbSingleton();
+  await resetDbSingleton();
   return AppDatabase.open({ backend: new IndexedDbBackend() });
 }
 
 beforeEach(async () => {
-  resetDbSingleton();
+  await resetDbSingleton();
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('cclab');
     req.onsuccess = (): void => resolve();

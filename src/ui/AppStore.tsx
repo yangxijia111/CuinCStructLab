@@ -65,6 +65,9 @@ export interface AppStoreValue {
   exportData(): Promise<string>;
   /** 清空全部数据（关闭并删除底层数据库 + 重置内存态，二次确认在 UI 层） */
   resetAllData(): Promise<void>;
+  /** 自定义编译器路径（空串 = 自动探测；持久化，重启恢复） */
+  compilerPath: string;
+  setCompilerPath(path: string): void;
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
@@ -97,6 +100,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
   const [favorites, setFavorites] = useState<Array<{ targetType: TargetType; targetId: string; createdAt: number }>>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [compilerPath, setCompilerPathState] = useState('');
 
   // 启动：加载 SQLite 并恢复状态
   useEffect(() => {
@@ -140,6 +144,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
           document.documentElement.dataset.theme = settings.theme;
         }
         if (settings.beginnerMode === '1') setBeginnerModeState(true);
+        if (typeof settings.compilerPath === 'string') setCompilerPathState(settings.compilerPath);
         setStorageReady(true);
       } catch (err) {
         if (!cancelled) {
@@ -150,6 +155,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // 页面关闭/隐藏前强制落盘（防抖窗口内的修改不丢）
+  useEffect(() => {
+    const flushNow = (): void => {
+      void getDb()
+        .then((db) => db.flush())
+        .catch((err: unknown) => {
+          console.error('退出前落盘失败:', err);
+        });
+    };
+    window.addEventListener('beforeunload', flushNow);
+    document.addEventListener('visibilitychange', flushNow);
+    return () => {
+      window.removeEventListener('beforeunload', flushNow);
+      document.removeEventListener('visibilitychange', flushNow);
     };
   }, []);
 
@@ -175,6 +197,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
     (on: boolean): void => {
       setBeginnerModeState(on);
       withDb((db) => repos.saveSetting(db, 'beginnerMode', on ? '1' : '0'));
+    },
+    [withDb],
+  );
+
+  /** 自定义编译器路径（空串 = 自动探测），持久化到 settings 表 */
+  const setCompilerPath = useCallback(
+    (path: string): void => {
+      setCompilerPathState(path);
+      withDb((db) => repos.saveSetting(db, 'compilerPath', path));
     },
     [withDb],
   );
@@ -341,6 +372,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       isFavorite,
       exportData,
       resetAllData,
+      compilerPath,
+      setCompilerPath,
     }),
     [
       storageReady,
@@ -363,6 +396,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       isFavorite,
       exportData,
       resetAllData,
+      compilerPath,
+      setCompilerPath,
     ],
   );
 

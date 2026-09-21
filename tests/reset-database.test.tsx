@@ -14,7 +14,7 @@ import { SettingsPage } from '../src/pages/SettingsPage';
 // fake-indexeddb 在 setup.ts 全局注入
 
 beforeEach(async () => {
-  resetDbSingleton();
+  await resetDbSingleton();
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('cclab');
     req.onsuccess = (): void => resolve();
@@ -57,7 +57,7 @@ describe('resetDatabase：IndexedDB 后端（浏览器真实路径）', () => {
     db2.close();
 
     // 再次冷启动（模拟刷新）仍为空
-    resetDbSingleton();
+    await resetDbSingleton();
     const db3 = await AppDatabase.open({ backend: new IndexedDbBackend() });
     expect(repos.loadChapterProgress(db3)).toEqual({});
     db3.close();

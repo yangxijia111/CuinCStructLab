@@ -47,8 +47,8 @@ class BlockingBackend implements PersistenceBackend {
   }
 }
 
-beforeEach(() => {
-  resetDbSingleton();
+beforeEach(async () => {
+  await resetDbSingleton();
 });
 
 describe('flush 竞态', () => {

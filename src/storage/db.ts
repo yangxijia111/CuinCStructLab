@@ -205,18 +205,32 @@ export class AppDatabase {
 /** 应用级单例（由 AppStore 在启动时初始化） */
 let singleton: AppDatabase | null = null;
 /** 进行中的 open（并发 getDb() 复用同一 promise，杜绝双开实例） */
-let opening: Promise<AppDatabase> | null = null;
+let opening: Promise<AppDatabase | null> | null = null;
+/** open 代次：reset 期间挂起的 open 完成后不得再覆盖 singleton（防“复活”） */
+let openToken = 0;
 
 export async function getDb(): Promise<AppDatabase> {
-  if (singleton !== null) return singleton;
-  if (opening === null) {
-    opening = AppDatabase.open().then((db) => {
-      singleton = db;
-      opening = null;
-      return db;
-    });
+  for (;;) {
+    if (singleton !== null) return singleton;
+    const token = openToken;
+    if (opening === null) {
+      opening = AppDatabase.open()
+        .then((db) => {
+          if (token !== openToken) {
+            // open 期间发生了 reset：此实例已过期，关闭并重开
+            db.close();
+            return null;
+          }
+          singleton = db;
+          return db;
+        })
+        .finally(() => {
+          opening = null;
+        });
+    }
+    const db = await opening;
+    if (db !== null) return db;
   }
-  return opening;
 }
 
 /**
@@ -225,21 +239,30 @@ export async function getDb(): Promise<AppDatabase> {
  * （Web：IndexedDB 库；Electron：userData/cuincstructlab.db）→ 重新 open + migrate。
  */
 export async function resetDatabase(deps?: Partial<AppDatabaseDeps>): Promise<AppDatabase> {
+  openToken += 1;
+  opening = null;
   if (singleton !== null) {
     singleton.close();
     singleton = null;
   }
-  opening = null;
   const backend = deps?.backend ?? (await import('./backend')).defaultBackend();
   await backend.reset();
   singleton = await AppDatabase.open({ ...deps, backend });
   return singleton;
 }
 
-/** 测试辅助：重置单例 */
-export function resetDbSingleton(): void {
+/** 测试辅助：重置单例（先落盘未保存的修改再关闭，等价「正常退出前 flush」） */
+export async function resetDbSingleton(): Promise<void> {
+  openToken += 1;
+  opening = null;
   if (singleton !== null) {
-    singleton.close();
+    const db = singleton;
     singleton = null;
+    try {
+      await db.flush();
+    } catch (err) {
+      console.error('resetDbSingleton: flush 失败', err);
+    }
+    db.close();
   }
 }

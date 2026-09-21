@@ -1,23 +1,53 @@
 /**
- * 设置页（FR-UI + FR-DATA-04）：主题 / 新手模式 / 编译器路径 / 数据导出导入 / 清空数据（二次确认）。
+ * 设置页（FR-UI + FR-DATA-04）：主题 / 新手模式 / 编译器链路（浏览→检测→显示版本→保存）/
+ * 数据导出导入 / 清空数据（二次确认）。
  */
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../ui/AppStore';
-import { detectCompilers } from '../runner/runner';
+import { detectCompilersWithFallback } from '../runner/runner';
 import type { RunnerAvailability } from '../runner/runner';
 
+/** 桌面桥（浏览按钮仅桌面可用） */
+function getBridge(): { chooseCompilerPath(): Promise<string | null> } | null {
+  const bridge = (globalThis as { cclabBridge?: { isDesktop: true; chooseCompilerPath(): Promise<string | null> } }).cclabBridge;
+  return bridge !== undefined && bridge.isDesktop ? bridge : null;
+}
+
 export function SettingsPage(): React.ReactElement {
-  const { theme, setTheme, beginnerMode, setBeginnerMode, exportData, resetAllData, storageError } = useAppStore();
-  const [compilerPath, setCompilerPath] = useState('');
+  const { theme, setTheme, beginnerMode, setBeginnerMode, exportData, resetAllData, storageError, compilerPath, setCompilerPath } =
+    useAppStore();
+  const [pathDraft, setPathDraft] = useState(compilerPath);
+  const [prevStorePath, setPrevStorePath] = useState(compilerPath);
   const [availability, setAvailability] = useState<RunnerAvailability | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
+  // 启动恢复 / 检测保存后：同步输入框草稿（渲染期间调整 state，避免级联 effect）
+  if (prevStorePath !== compilerPath) {
+    setPrevStorePath(compilerPath);
+    setPathDraft(compilerPath);
+  }
+
+  // 自定义路径变化时自动探测
   useEffect(() => {
-    void detectCompilers(compilerPath.trim() === '' ? undefined : compilerPath.trim()).then(setAvailability);
-    // 仅在挂载时探测一次默认环境
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void detectCompilersWithFallback(compilerPath).then(setAvailability);
+  }, [compilerPath]);
+
+  const doBrowse = async (): Promise<void> => {
+    const bridge = getBridge();
+    if (bridge === null) {
+      setMessage('选择文件仅桌面版可用：浏览器请直接粘贴路径。');
+      return;
+    }
+    const picked = await bridge.chooseCompilerPath();
+    if (picked !== null) setPathDraft(picked);
+  };
+
+  const doDetectAndSave = (): void => {
+    const trimmed = pathDraft.trim();
+    setCompilerPath(trimmed); // 触发 useEffect 重新探测
+    setMessage(trimmed === '' ? '已清除自定义路径，使用自动探测。' : '已保存自定义路径并重新检测。');
+  };
 
   const doExport = async (): Promise<void> => {
     try {
@@ -83,7 +113,7 @@ export function SettingsPage(): React.ReactElement {
           <p className="empty-hint">探测中…</p>
         ) : availability.available ? (
           <p className="setting-ok">
-            ✓ 已找到编译器：{availability.compiler?.kind}（{availability.compiler?.version}）
+            ✓ 可用：{availability.compiler?.kind} · {availability.compiler?.path} · {availability.compiler?.version}
           </p>
         ) : (
           <div className="runner-warn">
@@ -91,14 +121,25 @@ export function SettingsPage(): React.ReactElement {
             <p className="runner-hint">{availability.installHint}</p>
           </div>
         )}
+        {availability !== null && availability.reason !== '' && availability.available && (
+          <p className="runner-hint">{availability.reason}</p>
+        )}
         <div className="setting-row">
           <span>自定义编译器路径（可选，优先于自动探测）</span>
-          <input
-            className="setting-input"
-            value={compilerPath}
-            placeholder="如 C:\\msys64\\mingw64\\bin\\gcc.exe"
-            onChange={(e) => setCompilerPath(e.target.value)}
-          />
+          <div className="setting-actions">
+            <input
+              className="setting-input"
+              value={pathDraft}
+              placeholder="如 C:\msys64\mingw64\bin\gcc.exe"
+              onChange={(e) => setPathDraft(e.target.value)}
+            />
+            <button type="button" className="btn" onClick={() => void doBrowse()}>
+              浏览…
+            </button>
+            <button type="button" className="btn primary" onClick={doDetectAndSave}>
+              检测并保存
+            </button>
+          </div>
         </div>
         <p className="empty-hint">说明：本地编译运行不是安全沙箱，详见 SECURITY.md。</p>
       </section>

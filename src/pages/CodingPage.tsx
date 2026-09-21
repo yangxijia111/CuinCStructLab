@@ -8,7 +8,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { CODING_PROBLEMS } from '../coding/problems';
 import type { CodingProblem } from '../coding/problems';
-import { detectCompilers } from '../runner/runner';
+import { detectCompilersWithFallback } from '../runner/runner';
 import type { RunnerAvailability } from '../runner/runner';
 import { compileAndRun } from '../runner/runner';
 import { judgeSubmission } from '../judge/judge';
@@ -21,6 +21,7 @@ import { saveSubmission } from '../storage/repos';
 export function CodingPage(): React.ReactElement {
   const [params] = useSearchParams();
   const chapterParam = params.get('chapter');
+  const { compilerPath } = useAppStore();
   const [problemId, setProblemId] = useState<string | null>(() => {
     if (chapterParam !== null) {
       const first = CODING_PROBLEMS.find((p) => p.chapter === Number(chapterParam));
@@ -31,9 +32,10 @@ export function CodingPage(): React.ReactElement {
   const [availability, setAvailability] = useState<RunnerAvailability | null>(null);
   const { withDbRef } = useCodingPersistence();
 
+  // 使用设置页保存的自定义编译器路径（含失效自动回退 PATH 探测）
   useEffect(() => {
-    void detectCompilers().then(setAvailability);
-  }, []);
+    void detectCompilersWithFallback(compilerPath).then(setAvailability);
+  }, [compilerPath]);
 
   const problem = problemId === null ? null : (CODING_PROBLEMS.find((p) => p.id === problemId) ?? null);
 
