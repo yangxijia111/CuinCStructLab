@@ -1,18 +1,22 @@
 /**
- * Electron 冒烟测试：启动 → 加载生产构建 → 确认页面标题渲染 → 退出 0。
+ * Electron 冒烟测试：启动 → 经 app:// 协议加载生产构建 → 确认页面标题渲染 → 退出 0。
  * 用法：npm run build && npm run electron:smoke
+ * 与生产窗口同安全配置（webSecurity/sandbox 开启），同时验证自定义协议加载链路。
  */
 const { app, BrowserWindow } = require('electron');
-const path = require('node:path');
+const { registerAppProtocolScheme, attachAppProtocolHandler, APP_ENTRY } = require('./protocol.cjs');
+
+registerAppProtocolScheme();
 
 app.whenReady().then(async () => {
+  attachAppProtocolHandler();
   const win = new BrowserWindow({
     show: false,
-    webPreferences: { contextIsolation: true, sandbox: false, webSecurity: false },
+    webPreferences: { contextIsolation: true, sandbox: true, webSecurity: true },
   });
   let exitCode = 1;
   try {
-    await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    await win.loadURL(APP_ENTRY);
     // 等待 React 渲染出品牌名
     await new Promise((r) => setTimeout(r, 500));
     const ok = await win.webContents.executeJavaScript(
