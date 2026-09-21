@@ -2532,3 +2532,104 @@ button {
   white-space: pre-wrap;
   font-family: inherit;
 }
+
+/* ============ 可访问性：统一键盘焦点样式（P14 P2-2） ============ */
+/* 键盘导航时所有可交互元素显示清晰焦点环；鼠标点击不显示（:focus-visible） */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='tab']:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:focus-visible,
+input[type='range']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+input[type='range']:focus-visible {
+  outline-offset: 4px;
+}
+
+/* 表单控件聚焦态与搜索框一致（覆盖 outline:none 的历史写法） */
+.search-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 滑块拖柄的焦点可见性 */
+input[type='range']::-webkit-slider-thumb {
+  cursor: pointer;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============ 响应式与小窗口（P14 P2-3）：1024×680 / 900×600 不裁切关键内容 ============ */
+/* ≤1024px：三栏区域收紧，导航横向滚动，侧栏变窄 */
+@media (max-width: 1024px) {
+  .coding-page,
+  .stat-grid2,
+  .settings-page {
+    flex-direction: column;
+  }
+
+  .coding-list {
+    width: auto;
+    max-height: 220px;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .content,
+  .coding-main {
+    min-width: 0;
+  }
+
+  /* 表格类内容允许横向滚动，绝不永久裁切 */
+  .pw-statement-text,
+  .pw-reference {
+    overflow-x: auto;
+  }
+}
+
+/* ≤900px：侧栏与主内容堆叠；播放条换行；统计卡单列 */
+@media (max-width: 900px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 8px;
+  }
+
+  .sidebar nav {
+    display: flex;
+    gap: 4px;
+    min-width: max-content;
+  }
+
+  .stat-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-editor-head {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 横向滚动兜底：任何超宽内容可滚动到达 */
+  .page {
+    overflow-x: auto;
+  }
+}

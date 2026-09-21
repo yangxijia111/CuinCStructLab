@@ -216,7 +216,7 @@ const CH02: Chapter = {
 const CH03: Chapter = {
   id: 3,
   title: '单链表',
-  subtitle: '指针串起的节点：插入删除 O(1) 的代价是失去随机访问',
+  subtitle: '指针串起的节点：接线 O(1)，但定位要 O(n)——失去随机访问的代价',
   keywords: ['单链表', '链表', 'Node', '指针', '头插', '尾插', '插入', '删除', '遍历', 'free'],
   sections: [
     {
