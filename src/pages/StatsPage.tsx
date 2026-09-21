@@ -5,8 +5,9 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CHAPTERS } from '../content';
-import { MASTERY_LABELS, computeMastery, streakDays, todayKey } from '../storage/mastery-rules';
+import { MASTERY_LABELS, streakDays, todayKey } from '../storage/mastery-rules';
 import type { MasteryLevel } from '../storage/mastery-rules';
+import { computeKnowledgePointStats, countMasteryLevels } from '../storage/knowledge-registry';
 import { getDb } from '../storage/db';
 import { loadStudyDays } from '../storage/repos';
 import { useAppStore } from '../ui/AppStore';
@@ -29,31 +30,22 @@ export function StatsPage(): React.ReactElement {
     const correct = attempts.filter((a) => a.correct).length;
     const wrong = Object.keys(wrongBook).length;
     const streak = streakDays(studyDays);
-    // 知识点掌握（按 knowledgePoint 聚合答题）
-    const byKp = new Map<string, { attempts: number; correct: number; mastered: boolean }>();
-    for (const a of attempts) {
-      const cur = byKp.get(a.knowledgePoint) ?? { attempts: 0, correct: 0, mastered: false };
-      cur.attempts += 1;
-      if (a.correct) cur.correct += 1;
-      byKp.set(a.knowledgePoint, cur);
-    }
-    // 章节有学习行为 → 对应知识点至少处于 learning（无答题数据时）
+    // 知识点掌握：基于注册表全集（未做题的知识点也参与统计，P14 P1-4）
     const studiedChapterIds = new Set<number>();
     for (const [ch, p] of Object.entries(progress)) {
       if (p.status !== 'new') studiedChapterIds.add(Number(ch));
     }
-    const mastery: Record<string, number> = { unlearned: 0, learning: 0, weak: 0, basic: 0, mastered: 0 };
-    for (const [kp, d] of byKp) {
-      const wrongItem = Object.values(wrongBook).find((w) => w.knowledgePoint === kp && w.mastered);
-      const chapterId = CHAPTERS.find((c) => c.title === kp)?.id ?? -1;
-      const level = computeMastery({
-        attempts: d.attempts,
-        correct: d.correct,
-        hasStudyActivity: d.attempts > 0 || studiedChapterIds.has(chapterId),
-        manuallyMastered: wrongItem !== undefined,
-      });
-      mastery[level] += 1;
-    }
+    const masteredExerciseIds = new Set(
+      Object.values(wrongBook)
+        .filter((w) => w.mastered)
+        .map((w) => w.exerciseId),
+    );
+    const kpStats = computeKnowledgePointStats({
+      attempts: attempts.map((a) => ({ exerciseId: a.exerciseId, correct: a.correct })),
+      studiedChapters: studiedChapterIds,
+      masteredExerciseIds,
+    });
+    const mastery = countMasteryLevels(kpStats);
     // 近 30 天答题趋势
     const days30: Array<{ day: string; count: number }> = [];
     for (let i = 29; i >= 0; i--) {
