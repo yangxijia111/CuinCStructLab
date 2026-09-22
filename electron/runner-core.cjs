@@ -227,9 +227,17 @@ function execSafe(cmd, args, opts) {
       clearTimeout(timer);
       resolve({ code: null, stdout, stderr: `${stderr}${stderr === '' ? '' : '\n'}${err.message}`, timedOut: killed, durationMs: performance.now() - started });
     });
-    proc.on('close', (code) => {
+    proc.on('close', (code, signal) => {
       clearTimeout(timer);
-      resolve({ code, stdout, stderr, timedOut: killed, durationMs: performance.now() - started });
+      // 信号终止（SIGSEGV/SIGABRT/SIGKILL…）时 code 为 null：映射为非零退出码，
+      // 保证"崩溃"不会被误判为通过（timedOut 的 TLE 判定在 judge 层优先于 RE）
+      resolve({
+        code: code ?? (signal ? -1 : null),
+        stdout,
+        stderr,
+        timedOut: killed,
+        durationMs: performance.now() - started,
+      });
     });
     if (opts.stdin !== undefined && proc.stdin !== null) {
       proc.stdin.write(opts.stdin);

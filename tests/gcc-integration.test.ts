@@ -164,6 +164,12 @@ describe('runner-core 子进程行为（node 作为真实被测程序）', () =>
     expect(r.durationMs).toBeGreaterThanOrEqual(500);
   });
 
+  it('信号崩溃映射为非零退出码（RE 判定依据；null code 不得视为通过）', async () => {
+    const r = await runnerCore.execSafe(NODE, ['-e', 'process.kill(process.pid, "SIGSEGV")'], { timeoutMs: 10000 });
+    expect(r.code).not.toBeNull();
+    expect(r.code).not.toBe(0);
+  });
+
   it('stdout 超限截断（限幅后不再增长）', async () => {
     const r = await runnerCore.execSafe(
       NODE,
@@ -267,8 +273,17 @@ describe('gcc 集成：全部编程题 referenceSolution 必须 Accepted', () =>
 
   it.skipIf(!hasCompiler)('WA：恒空实现（不写入任何元素）被判 Wrong Answer', { timeout: 60_000 }, async () => {
     const problem = CODING_PROBLEMS.find((p) => p.id === 'p-stack-push')!;
-    // 注入缺陷：push 什么都不做 → 输出恒为空，与任何非空期望稳定不符
-    const badCode = `int stackPush(ArrayStack *s, int value) { (void)s; (void)value; return -1; }\n`;
+    // 注入缺陷：push 什么都不做 → 输出恒为空，与任何非空期望稳定不符（自带类型定义保证可编译）
+    const badCode = `#include <stdio.h>
+#define STACK_CAP 8
+
+typedef struct {
+    int data[STACK_CAP];
+    int top;
+} ArrayStack;
+
+int stackPush(ArrayStack *s, int value) { (void)s; (void)value; return -1; }
+`;
     const outcome = await runnerCore.compileAndRun(
       compiler!,
       badCode,
