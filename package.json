@@ -15,7 +15,7 @@
     "coverage": "cross-env COVERAGE_RUN=1 vitest run --coverage",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "electron:dev": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.cjs",
-    "electron:build": "npm run build "electron:build": "npm run build && electron-builder --win --x64""electron:build": "npm run build && electron-builder --win --x64" electron-builder --win --x64 -p never",
+    "electron:build": "npm run build && electron-builder --win --x64 -p never",
     "electron:start": "electron electron/main.cjs",
     "electron:smoke": "electron electron/smoke.cjs"
   },
