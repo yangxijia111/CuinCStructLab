@@ -47,11 +47,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install xvfb (headless display for Electron)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Electron smoke (production build via app:// protocol)
-        run: npm run electron:smoke
-        # 冒烟需要无头显示环境
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run electron:smoke
         env:
           ELECTRON_DISABLE_SANDBOX: '1'
+
+      - name: Electron smoke (production build via app:// protocol)
+        if: runner.os == 'Windows'
+        run: npm run electron:smoke
 
   gcc-runner:
     name: GCC runner integration (all coding problems)
