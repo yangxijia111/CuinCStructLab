@@ -6,6 +6,7 @@
 
 ### Fixed
 - **p-stack-push 错误 expected**：第 2 组用例期望由 `1 2 3 4 5 6 7 8` 修正为 `1 2 3 4 5 6 7`（栈满 push 忽略 + pop 弹出栈顶 8）；真 gcc 验证通过。
+- **referenceSolution 不自包含**（CI 真 gcc 首跑发现）：6 题补类型定义与 include，p-mystrlen 补 `<stddef.h>`；runner 信号终止（SIGSEGV 等）由 null 退出码映射为非零，崩溃不再被误判 Accepted；判题 stdin EPIPE（子进程先退出）不再作为未处理错误。
 - **章节完成状态降级**：done 章节复习时不再被重置为 learning（内存态与 SQL 均保持 done 单调终态）。
 - **持久化 flush 竞态**：保存期间的新写入不再被旧 flush 清掉 dirty（revision 计数 + flush 串行链 + while-dirty 循环），压力测试 100 连写丢失场景修复。
 - **「清空全部数据」**：Web/Electron 统一 `resetDatabase()`——先关闭连接再删除底层介质（IndexedDB 库 / userData 文件），UI 状态同步清空；此前 Electron 下完全无效、Web 下连接未关可能阻塞。

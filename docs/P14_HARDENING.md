@@ -161,3 +161,15 @@
 16. `getDb()` 并发双开实例 + reset 期间挂起 open 的"复活"（openToken 代次）。
 17. 防抖窗口内关闭页面丢数据（beforeunload/visibilitychange 强制 flush + resetDbSingleton 先 flush）。
 18. coverage 插桩使性能断言变慢 ~2x（`COVERAGE_RUN=1` 环境区分阈值：普通 200ms / 插桩 500ms，算法实现未改动）。
+
+### CI 真实 gcc 首跑抓到的缺陷（P14 价值的最直接证明）
+
+19. **referenceSolution 不自包含**：类型定义（SeqList/Node/ArrayStack/CircularQueue/TreeNode）只存在于用户模板中，单独编译参考答案即 `unknown type name` 编译错误；p-mystrlen 缺 `<stddef.h>`（size_t）。→ 修复：6 题 referenceSolution 补类型定义与 include。旧测试从未真正编译过，这正是"只检查字段存在"掩盖的问题。
+20. **信号终止被误判 Accepted**：进程被 SIGSEGV 等信号终止时 `close` 的 code 为 null，judge 的 RE 判定被跳过 → runner-core 映射为非零退出码。
+21. **stdin EPIPE unhandled**：子进程先于写入退出时（不读 stdin 的程序）管道写入触发 EPIPE → stdin 挂接错误监听（结果以 exit code/signal 为准）。
+
+### CI 说明
+
+- 矩阵为 **Node 22/24**：jsdom 30 要求 node ≥22.22（上游已淘汰 Node 20，GitHub Actions 亦标记 Node 20 deprecated）。
+- ubuntu 的 Electron smoke 经 `xvfb-run -a` 提供虚拟显示。
+- CI 运行历史：gcc-runner 首跑即抓到 #19/#20（Run 35670399538 / 35670587448），修复后 Run 35671540020 gcc-runner ✓、Node 22 ✓；#21 修复于 Run 35671927902 起全绿。
