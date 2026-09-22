@@ -10,16 +10,16 @@ jobs:
   verify:
     name: Verify (Node ${{ matrix.node }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-      strategy:
-        fail-fast: false
-        matrix:
-          os: [ubuntu-latest]
-          # jsdom 30 要求 node >=22.22（Node 20 已被上游依赖淘汰）
-          node: [22, 24]
-          include:
-            # Windows 冒烟：核心验证 + 构建在 Windows 侧再跑一遍
-            - os: windows-latest
-              node: 22
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # jsdom 30 要求 node >=22.22（Node 20 已被上游依赖淘汰）
+        node: [22, 24]
+        include:
+          # Windows 冒烟：核心验证 + 构建在 Windows 侧再跑一遍
+          - os: windows-latest
+            node: 22
     steps:
       - uses: actions/checkout@v4
 
