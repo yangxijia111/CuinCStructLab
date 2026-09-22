@@ -240,6 +240,8 @@ function execSafe(cmd, args, opts) {
       });
     });
     if (opts.stdin !== undefined && proc.stdin !== null) {
+      // 子进程可能先于写入退出（如不读 stdin 的程序）：EPIPE 属预期，不作为判题错误
+      proc.stdin.on('error', () => {});
       proc.stdin.write(opts.stdin);
       proc.stdin.end();
     } else {
