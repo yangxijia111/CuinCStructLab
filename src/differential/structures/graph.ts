@@ -43,11 +43,14 @@ function generateC(cases: DifferentialCase[]): string {
   const count = GRAPH_C_CODE.filter(isPrintLine).length;
   if (count !== 2) throw new Error(`GRAPH_C_CODE 结构变化：期望 2 处遍历输出语句，实际 ${count}`);
   const lines: string[] = [];
-  lines.push(teaching);
+  // 访问序记录必须定义在教学 dfs/bfs 之前（C99 禁止隐式函数声明）
   lines.push(
     'static int cclabOrder[64];',
     'static int cclabOrderN;',
     'static void cclabRecord(int u) { cclabOrder[cclabOrderN++] = u; }',
+  );
+  lines.push(teaching);
+  lines.push(
     'static void cclabClearVisited(void) { for (int i = 0; i < MAXN; i++) visited[i] = 0; }',
     'static void cclabPrintOrder(const char *tag) {',
     '    printf("OBS:%s order=[", tag);',

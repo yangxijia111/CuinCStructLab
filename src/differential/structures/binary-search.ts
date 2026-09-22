@@ -23,6 +23,8 @@ function runTs(c: DifferentialCase): TsRunResult {
 
 function generateC(cases: DifferentialCase[]): string {
   const lines: string[] = [];
+  // SEARCH_C_CODE 不含 #include：harness 需要 printf
+  lines.push('#include <stdio.h>', '');
   lines.push(...SEARCH_C_CODE);
   // TS 侧 state 携带 values：补 ARR 输出对齐（数组不被查找改动，双方应一致）
   lines.push(
