@@ -63,10 +63,15 @@ describe('preload 最小暴露（preload.cjs）', () => {
 });
 
 describe('app:// 协议（protocol.cjs）', () => {
-  it('必须包含路径穿越防护', () => {
+  it('必须包含路径穿越防护（P15：path.relative 判定，禁止弱化的字符串前缀判断）', () => {
     const src = read('protocol.cjs');
-    expect(src).toContain('startsWith(DIST_ROOT)');
-    expect(src).toContain('path.normalize');
+    const appPath = read('app-path.cjs');
+    // P15 修复：startsWith(DIST_ROOT) 前缀判断允许兄弟目录 dist-evil 穿越，已替换为 path.relative
+    expect(src).not.toContain('startsWith(DIST_ROOT)');
+    expect(src).toContain('resolveAppPath');
+    expect(appPath).toContain("startsWith('..')");
+    expect(appPath).toContain('path.isAbsolute');
+    expect(appPath).toContain('decodeURIComponent');
   });
 
   it('注册为标准 + 安全协议', () => {
