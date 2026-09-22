@@ -130,14 +130,15 @@ describe('审计：排序边界（含大数组一致性）', () => {
 
 describe('审计：性能指标（NFR-05）', () => {
   it('64 元素排序步骤生成：单算法 < 200ms（交互响应指标；多次取样取最小值以抗并行负载抖动）', () => {
-    // coverage 插桩会让 JS 恒定变慢 ~2x，插桩运行（npm run coverage）放宽到 500ms；阈值语义不变
+    // coverage 插桩会让 JS 恒定变慢 ~2x，插桩运行（npm run coverage）放宽到 500ms；阈值语义不变。
+    // P15：取样 3→8 次（本机高负载并行时 3 次最小值仍可能撞上调度毛刺；阈值与语义不变）
     const threshold = process.env.COVERAGE_RUN === '1' ? 500 : 200;
     const rnd = seededRandom(7);
     const arr = Array.from({ length: 64 }, () => Math.floor(rnd() * 100));
     for (const id of ['quick', 'merge', 'heap', 'bubble'] as const) {
       sortWithSteps(id, arr); // warmup（JIT/缓存）
       let best = Number.POSITIVE_INFINITY;
-      for (let round = 0; round < 3; round++) {
+      for (let round = 0; round < 8; round++) {
         const t0 = performance.now();
         sortWithSteps(id, arr);
         best = Math.min(best, performance.now() - t0);
