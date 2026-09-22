@@ -106,8 +106,9 @@ storage 89.5% statements / judge 100% / exercises 93% / core 全部达标；**�
 | `98cd6c1` | feat: add validated JSON data import (preview + backup + transactional) |
 | `1c9ec11` | docs: correct teaching complexity descriptions + a11y/responsive hardening |
 | `448e4de` | ci: add full verification workflow, MIT license, coverage gate and electron packaging |
+| `7dae2e4` | chore: release v1.0.1 (docs, README, final reports, version alignment) |
 
-（本报告与发布提交为 release/v1.0.1 收尾提交。）
+（本报告为 P14 收尾文档。）
 
 ## 13. Tag
 
