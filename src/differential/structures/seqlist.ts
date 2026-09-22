@@ -141,7 +141,7 @@ function generateCases(seed: number, count: number): DifferentialCase[] {
         operations.push({ op: 'set', args: [pos, rng.int(-99, 99)] });
       } else {
         // find：一半概率找存在的值
-        const v = rng.bool(0.5) && size > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-99, 99);
+        const v = rng.bool(0.5) && values.length > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-99, 99);
         operations.push({ op: 'find', args: [v] });
       }
     }

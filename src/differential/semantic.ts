@@ -4,10 +4,10 @@
  */
 import type { CCaseOutput, DiffCaseResult, DifferentialCase, SemanticState, TsRunResult } from './types';
 
-/** canonical JSON（键排序，紧凑） */
+/** canonical JSON（键排序，紧凑；排除 kind——C 侧解析不携带该标签字段，结构标识由 suite 保证一致） */
 export function canonical(state: SemanticState | null | undefined): string {
   if (state === null || state === undefined) return 'null';
-  const keys = Object.keys(state).filter((k) => k !== TAG_KEY).sort();
+  const keys = Object.keys(state).filter((k) => k !== TAG_KEY && k !== 'kind').sort();
   const record = state as unknown as Record<string, unknown>;
   return JSON.stringify(keys.map((k) => [k, record[k]]));
 }

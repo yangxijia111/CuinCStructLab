@@ -187,15 +187,15 @@ function generateCases(seed: number, count: number): DifferentialCase[] {
         operations.push({ op: 'deleteAt', args: [pos] });
         if (pos >= 0 && pos < size) size--;
       } else if (kind === 4) {
-        const v = rng.bool(0.5) && size > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
+        const v = rng.bool(0.5) && values.length > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
         operations.push({ op: 'deleteValue', args: [v] });
         // 按值删除：粗略同步 size（值存在才 -1；差分由终态判定，size 跟踪只为生成合理 pos）
         size = Math.max(0, size - 1);
       } else if (kind === 5) {
-        const from = rng.bool(0.5) && size > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
+        const from = rng.bool(0.5) && values.length > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
         operations.push({ op: 'set', args: [from, rng.int(-50, 50)] });
       } else if (kind === 6) {
-        const v = rng.bool(0.5) && size > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
+        const v = rng.bool(0.5) && values.length > 0 ? values[rng.int(0, values.length - 1)]! : rng.int(-50, 50);
         operations.push({ op: 'find', args: [v] });
       } else {
         operations.push({ op: 'traverse', args: [] });
