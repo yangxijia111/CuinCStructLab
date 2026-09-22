@@ -91,6 +91,9 @@ Step 须标记：visited 集合、current node、next node（正在考察的邻�
 ## 9. 查找与排序（`src/core/algorithms/`）
 
 - search：linearSearch、binarySearch（前提：有序；每步展示 lo/hi/mid 与排除区间）。
+  **二分查找重复值规范（P15 裁决）**：命中即返回，重复值场景返回**某个**匹配下标（any-match），
+  不做首/末匹配强约束。一致性验证用 `idx === -1 ⇔ 不存在` 且 `idx ≥ 0 ⇒ a[idx] === target`
+  （见 DIFFERENTIAL_TEST_SPEC §7；差分测试据此比较）。
 - sorting：bubble / selection / insertion / shell / merge / quick / heap。
   每个 Step 附带：数组状态、compare 区间、swap 对、已排序区、pivot、merge 区间、`comparisons`/`swaps` 计数器。
   排序同时提供"纯函数版"（供测试对照）与"步骤版"。
