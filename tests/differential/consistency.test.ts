@@ -22,7 +22,7 @@ const runnerCore = require(path.join(process.cwd(), 'electron', 'runner-core.cjs
     compileExitCode: number;
     compileStdout: string;
     compileStderr: string;
-    cases: Array<{ index: number; actual: string; expected: string; exitCode: number | null; timedOut: boolean; durationMs: number }>;
+    cases: Array<{ index: number; stdin: string; expected: string; actual: string; exitCode: number | null; timedOut: boolean; durationMs: number }>;
   }>;
 };
 

@@ -5,17 +5,17 @@
 import { describe, expect, it } from 'vitest';
 import { SUITES } from '../../src/differential/framework';
 import { failureReport, parseCOutput, semanticEqual } from '../../src/differential/semantic';
-import type { CCaseOutput, DiffCaseResult } from '../../src/differential/types';
+import type { CCaseOutput, DiffCaseResult, TsRunResult } from '../../src/differential/types';
 
 const suite = SUITES['linked-list']!;
 const cases = suite.generateCases(7, 3);
 const ts = suite.runTs(cases[0]!);
 
-function fakeCFrom(ts: typeof ts): CCaseOutput {
+function fakeCFrom(r: TsRunResult): CCaseOutput {
   return {
     index: 0,
-    state: { ...ts.state },
-    observations: [...ts.observations],
+    state: { ...r.state },
+    observations: [...r.observations],
   };
 }
 

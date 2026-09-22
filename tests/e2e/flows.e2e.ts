@@ -225,8 +225,8 @@ describe.skipIf(!HAS_COMPILER)('场景 5：错误代码 → Wrong Answer', () =>
     const editor = page!.locator('.cm-content').first();
     await editor.click();
     await page!.keyboard.press('Control+a');
-    // 输入可编译但错误的代码：return -1 的恒失败实现（对 p-seqlist-insert 任何用例都不产出输出）
-    const wrong = '#include <stdio.h>\nint seqListInsert(int *a, int *n, int pos, int v) { (void)a;(void)n;(void)pos;(void)v; return -1; }\n';
+    // 与 p-seqlist-insert 模板签名一致的可编译错误实现（恒返回 -1 → 首用例即 WA）
+    const wrong = '#include <stdio.h>\n#define MAXN 2000\ntypedef struct { int data[MAXN]; int size; } SeqList;\nint seqListInsert(SeqList *L, int pos, int value) { (void)L; (void)pos; (void)value; return -1; }\n';
     await page!.evaluate((t) => navigator.clipboard.writeText(t), wrong);
     await page!.keyboard.press('Control+v');
     await page!.waitForTimeout(400);
