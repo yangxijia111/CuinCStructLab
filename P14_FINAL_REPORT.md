@@ -65,8 +65,12 @@ storage 89.5% statements / judge 100% / exercises 93% / core 全部达标；**�
 
 ## 8. gcc integration 结果
 
-- 本地（Windows，无 gcc）：runner-core 行为层 17 用例全过（node 作为真实子进程验证超时终止/输出限幅/stdin/真实 durationMs/payload 验证）；gcc 层 11 用例显式条件执行。
-- CI（Ubuntu，gcc 13）：全量 28 用例——全部 10 题 referenceSolution 编译运行全部用例 **Accepted**（含修正后的 p-stack-push 溢出用例）、WA/CE/RE/TLE 注入、无限循环终止、输出洪泛限幅、Unicode、临时目录零残留。
+- 本地（Windows，无 gcc）：runner-core 行为层 18 用例全过（node 作为真实子进程验证超时终止/输出限幅/stdin/信号退出码/durationMs/payload 验证）；gcc 层 12 用例显式条件执行。
+- **CI（Ubuntu，gcc）：gcc-runner job 全绿 ✅**——全部 10 题 referenceSolution 编译运行全部用例 **Accepted**（含修正后的 p-stack-push 溢出用例）、WA/CE/RE/TLE 注入、无限循环终止、输出洪泛限幅、Unicode、临时目录零残留。
+- **CI 真 gcc 首跑即抓到 3 个被旧测试掩盖的真实缺陷**（正是本轮要求"真实 gcc 验证"的价值证明）：
+  1. referenceSolution 不自包含（类型定义只在模板中）→ 编译失败 → 已补齐；
+  2. 信号终止的 null 退出码导致崩溃程序被误判 Accepted → runner-core 已映射为非零；
+  3. 判题 stdin 的 EPIPE unhandled error → 已挂接错误监听。
 - Windows/Linux 平台差异（binary 名、taskkill/SIGKILL）在 runner-core 单一实现内按平台分支并有静态断言。
 
 ## 9. Electron 安全改动
@@ -107,6 +111,13 @@ storage 89.5% statements / judge 100% / exercises 93% / core 全部达标；**�
 | `1c9ec11` | docs: correct teaching complexity descriptions + a11y/responsive hardening |
 | `448e4de` | ci: add full verification workflow, MIT license, coverage gate and electron packaging |
 | `7dae2e4` | chore: release v1.0.1 (docs, README, final reports, version alignment) |
+| `d65a0e3` | ci: run electron smoke under xvfb on linux runners |
+| `d8d2403` | fix: make reference solutions self-contained (types/includes)【CI 真 gcc 首跑发现】 |
+| `3f2b017` | fix: map signal termination to nonzero exit code (RE judgment) + self-contained WA fixture【CI 发现】 |
+| `25b0ed1` | fix: swallow EPIPE on runner stdin pipe (child may exit before write)【CI 发现】 |
+| `a7b492a`/`a6e726d` | ci: node 22/24 矩阵（jsdom 30 要求 node ≥22.22）+ 缩进修复 |
+| `e98ea2c`/`0745b98` | ci: electron-builder 关闭 publish 步骤（产物走 upload-artifact） |
+| `bf518f5`/后续 | docs: CI 发现缺陷补录 |
 
 （本报告为 P14 收尾文档。）
 
@@ -127,17 +138,19 @@ https://github.com/yangxijia111/CuinCStructLab/releases/tag/v1.0.1 （如 Releas
 5. **MSVC（cl）探测**：需要从 "x64 Native Tools Command Prompt" 启动（cl 依赖 vcvars 环境），PATH 探测在普通终端可能命中不了；gcc/clang 是推荐路径。
 6. **导入前向兼容**：高于当前 schemaVersion 的备份被拒绝（提示先升级应用），属设计约束。
 7. **coverage 覆盖范围**：仅统计 core/storage/exercises/judge（UI 渲染层不在阈值体系内）。
+8. **CI 矩阵为 Node 22/24**：jsdom 30 上游要求 node ≥22.22，Node 20 已被依赖链淘汰（GitHub Actions 亦标记 deprecated）。
 
-## 完整验证记录（本地 Windows 11 / Node v24）
+## 完整验证记录（本地 Windows 11 / Node v24 + GitHub Actions CI）
 
 | 步骤 | 结果 |
 | --- | --- |
-| npm ci | ✅（本地 install + lockfile 同步） |
+| npm ci | ✅（本地 install + lockfile 同步；CI npm ci 全 job 通过） |
 | npm run lint | ✅ 0 errors（2 个既有 warning：react-refresh 导出形态） |
 | npm run typecheck | ✅ |
-| npm run test | ✅ 34 files / 353 passed / 11 skipped（gcc→CI） |
-| npm run coverage | ✅ 阈值 85/80/85/85 达标 |
+| npm run test | ✅ 34 files / 353 passed 本地 + CI 全量（含 gcc 集成 365 全部通过，见 §8） |
+| npm run coverage | ✅ 阈值 85/80/85/85 达标（CI 真正执行） |
 | npm run build | ✅（含 CSP meta 注入） |
-| electron smoke | ✅ SMOKE-OK（app:// 协议加载） |
-| gcc integration | ✅ 本地行为层 17/17；gcc 层 CI 执行 |
-| electron:build | ✅ Setup + Portable 产出并实际启动 |
+| electron smoke | ✅ SMOKE-OK（app:// 协议加载；CI：ubuntu xvfb + windows 双环境通过） |
+| gcc integration | ✅ **CI gcc-runner job 全绿**（见 §8） |
+| electron:build | ✅ Setup + Portable 本地产出并实际启动验证；CI package job 构建成功并上传 Artifact |
+| CI workflow | ✅ verify（ubuntu×2 + windows）+ gcc-runner 全绿；package job 修复 publish 步骤后通过 |
