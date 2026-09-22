@@ -9,8 +9,6 @@ import { sortWithSteps } from '../src/core/algorithms/sorting';
 import { heapify, heapInsert } from '../src/core/data-structures/heap';
 import { graphFrom, graphDFS, graphBFS } from '../src/core/data-structures/graph';
 import { bstFrom } from '../src/core/data-structures/bst';
-import type { VizOutcome } from '../src/core/types';
-import type { VisualState } from '../src/core/types';
 
 /** 确定性伪随机 */
 const rng = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -32,9 +30,10 @@ function measure(label: string, fn: () => { steps: number; bytes: number }): voi
   const samples: number[] = [];
   let result = { steps: 0, bytes: 0 };
   let heapPeak = 0;
-  const hasGc = typeof global.gc === 'function';
+  const gc = (globalThis as { gc?: () => void }).gc;
+  const hasGc = typeof gc === 'function';
   for (let i = 0; i < 5; i++) {
-    if (hasGc) global.gc();
+    gc?.();
     const heapBefore = process.memoryUsage().heapUsed;
     const t0 = performance.now();
     result = fn();
@@ -50,14 +49,14 @@ function measure(label: string, fn: () => { steps: number; bytes: number }): voi
   });
 }
 
-function stats<S extends VisualState>(outcome: VizOutcome<S>): { steps: number; bytes: number } {
+function stats(outcome: { steps: unknown[] }): { steps: number; bytes: number } {
   // 逐步序列化累计（整体 stringify 在 bubble n=256 时超出 V8 最大字符串长度——这本身就是审计发现）
   let bytes = 0;
   for (const s of outcome.steps) bytes += JSON.stringify(s).length;
   return { steps: outcome.steps.length, bytes };
 }
 
-function lastState<S extends VisualState>(outcome: VizOutcome<S>): S {
+function lastState<S>(outcome: { steps: Array<{ afterState: S }> }): S {
   return outcome.steps[outcome.steps.length - 1]!.afterState;
 }
 

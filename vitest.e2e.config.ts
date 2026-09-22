@@ -15,7 +15,6 @@ export default defineConfig({
     setupFiles: ['./tests/e2e/setup.ts'],
     testTimeout: 180_000,
     hookTimeout: 180_000,
-    pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    fileParallelism: false,
   },
 });
