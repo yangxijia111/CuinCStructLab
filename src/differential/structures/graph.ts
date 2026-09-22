@@ -34,13 +34,13 @@ function runTs(c: DifferentialCase): TsRunResult {
   };
 }
 
-/** 教学 dfs/bfs 的输出语句（buildLineMap 同款锚点）→ 替换为访问序记录（逻辑不变，仅 IO 改道） */
-const DFS_PRINT_LINE = '    printf("%d ", u);';
+/** 教学 dfs/bfs 的输出语句（dfs 4 空格缩进 / bfs 8 空格缩进，按 trim 匹配）→ 替换为访问序记录（仅 IO 改道） */
 const RECORD_FN = '    cclabRecord(u);';
 
 function generateC(cases: DifferentialCase[]): string {
-  const teaching = GRAPH_C_CODE.map((l) => (l === DFS_PRINT_LINE ? RECORD_FN : l)).join('\n');
-  const count = GRAPH_C_CODE.filter((l) => l === DFS_PRINT_LINE).length;
+  const isPrintLine = (l: string): boolean => l.trim() === 'printf("%d ", u);';
+  const teaching = GRAPH_C_CODE.map((l) => (isPrintLine(l) ? RECORD_FN : l)).join('\n');
+  const count = GRAPH_C_CODE.filter(isPrintLine).length;
   if (count !== 2) throw new Error(`GRAPH_C_CODE 结构变化：期望 2 处遍历输出语句，实际 ${count}`);
   const lines: string[] = [];
   lines.push(teaching);

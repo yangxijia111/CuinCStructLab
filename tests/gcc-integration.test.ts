@@ -30,6 +30,7 @@ const runnerCore = require('../electron/runner-core.cjs') as {
     args: string[],
     opts: { cwd?: string; timeoutMs: number; stdin?: string },
   ): Promise<{ exitCode: number | null; signal: string | null; timedOut: boolean; spawnError: string | null; stdout: string; stderr: string; durationMs: number }>;
+  classifyOutcome: (o: { exitCode: number | null; signal: string | null; timedOut: boolean; spawnError: string | null }) => string;
   compileAndRun(
     compiler: CompilerInfo,
     userCode: string,
@@ -165,10 +166,18 @@ describe('runner-core 子进程行为（node 作为真实被测程序）', () =>
     expect(r.durationMs).toBeGreaterThanOrEqual(500);
   });
 
-  it('信号崩溃映射为非零退出码（RE 判定依据；null code 不得视为通过）', async () => {
+  it('信号崩溃绝不允许通过（P15：POSIX 报 signal，Windows 映射为非零退出码 0xC0000005）', async () => {
     const r = await runnerCore.execSafe(NODE, ['-e', 'process.kill(process.pid, "SIGSEGV")'], { timeoutMs: 10000 });
-    expect(r.exitCode).not.toBeNull();
-    expect(r.exitCode).not.toBe(0);
+    const cls = runnerCore.classifyOutcome(r);
+    if (process.platform === 'win32') {
+      // Windows 模拟信号 → 异常退出码（Access Violation），signal 为 null
+      expect(cls).toBe('nonzero_exit');
+      expect(r.exitCode).not.toBe(0);
+    } else {
+      expect(r.signal).toBe('SIGSEGV');
+      expect(cls).toBe('signal');
+    }
+    expect(cls).not.toBe('ok');
   });
 
   it('stdout 超限截断（限幅后不再增长）', async () => {

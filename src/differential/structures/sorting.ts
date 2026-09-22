@@ -25,12 +25,13 @@ function runTs(c: DifferentialCase): TsRunResult {
   const algo = c.operations[0]?.op as SortId;
   if (!SORT_IDS.includes(algo)) throw new Error(`sorting: 未知算法 ${algo}`);
   const result = sortWithSteps(algo, values);
-  observations.push(`${algo} n=${values.length}`);
   return { state: { kind: 'sorting', values: result.sorted, size: result.sorted.length }, observations };
 }
 
 function generateC(cases: DifferentialCase[]): string {
   const lines: string[] = [];
+  // 教学排序代码不含 #include：harness 需要 printf
+  lines.push('#include <stdio.h>', '');
   for (const id of SORT_IDS) lines.push(...SORT_C_CODES[id]);
   lines.push('int main(void) {');
   lines.push('    int a[256], tmp[256];');

@@ -24,7 +24,15 @@ function runTs(c: DifferentialCase): TsRunResult {
 function generateC(cases: DifferentialCase[]): string {
   const lines: string[] = [];
   lines.push(...SEARCH_C_CODE);
-  lines.push('int main(void) {');
+  // TS 侧 state 携带 values：补 ARR 输出对齐（数组不被查找改动，双方应一致）
+  lines.push(
+    'static void cclabPrintArr(const int *a, int n) {',
+    '    printf("ARR:[");',
+    '    for (int i = 0; i < n; i++) { printf("%s%d", i ? "," : "", a[i]); }',
+    '    printf("]\\n");',
+    '}',
+    'int main(void) {',
+  );
   cases.forEach((c, ci) => {
     const arr = c.initial.values ?? [];
     const n = Math.max(arr.length, 1);
@@ -43,6 +51,7 @@ function generateC(cases: DifferentialCase[]): string {
         `          printf("OBS:search t=${t} found=%d idxNeg=%d\\n", found, idx < 0 ? 1 : 0); }`,
       );
     }
+    lines.push('        cclabPrintArr(a, n);');
     lines.push('        printf("SIZE:%d\\n", n);');
     lines.push('    }');
     lines.push(`    printf("END ${ci}\\n");`);
