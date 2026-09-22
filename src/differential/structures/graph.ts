@@ -29,7 +29,7 @@ function runTs(c: DifferentialCase): TsRunResult {
     }
   }
   return {
-    state: { kind: 'graph', order: [], size: labels.length },
+    state: { kind: 'graph', size: labels.length },
     observations,
   };
 }
