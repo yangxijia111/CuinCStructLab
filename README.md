@@ -11,7 +11,7 @@
 ## Quick Start
 
 ```bash
-# 需要 Node.js ≥ 20
+# 需要 Node.js ≥ 22.22（jsdom 30 的最低要求，与 package.json engines 一致）
 npm install
 npm run dev              # 浏览器开发模式（完整功能，数据存 IndexedDB）
 ```

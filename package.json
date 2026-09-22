@@ -89,5 +89,8 @@
     "portable": {
       "artifactName": "CuinCStructLab-Portable-${version}.${ext}"
     }
+  },
+  "engines": {
+    "node": ">=22.22"
   }
 }
