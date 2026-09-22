@@ -69,7 +69,16 @@ int seqListInsert(SeqList *L, int pos, int value) {
       { stdin: '2\n1 2\n-1 9\n', expected: '-1' },
       { stdin: '0\n\n0 7\n', expected: '7' },
     ],
-    referenceSolution: `int seqListInsert(SeqList *L, int pos, int value) {
+    referenceSolution: `#include <stdio.h>
+
+#define MAXN 2000
+
+typedef struct {
+    int data[MAXN];
+    int size;
+} SeqList;
+
+int seqListInsert(SeqList *L, int pos, int value) {
     if (pos < 0 || pos > L->size) {
         return -1;
     }
@@ -129,7 +138,15 @@ int listPushBack(Node *head, int value) {
       { stdin: '0\n\n', expected: '' },
       { stdin: '5\n9 8 7 6 5\n', expected: '9 8 7 6 5' },
     ],
-    referenceSolution: `int listPushBack(Node *head, int value) {
+    referenceSolution: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int data;
+    struct Node *next;
+} Node;
+
+int listPushBack(Node *head, int value) {
     Node *newNode = (Node *)malloc(sizeof(Node));
     if (newNode == NULL) return -1;
     newNode->data = value;
@@ -187,7 +204,15 @@ int listDeleteValue(Node *head, int value) {
       { stdin: '3\n10 20 30\n99\n', expected: '-1' },
       { stdin: '1\n7\n7\n', expected: '' },
     ],
-    referenceSolution: `int listDeleteValue(Node *head, int value) {
+    referenceSolution: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int data;
+    struct Node *next;
+} Node;
+
+int listDeleteValue(Node *head, int value) {
     Node *prev = head;
     while (prev->next != NULL && prev->next->data != value) {
         prev = prev->next;
@@ -259,7 +284,15 @@ int stackPush(ArrayStack *s, int value) {
       },
       { stdin: '2\n5 0\n', expected: '' },
     ],
-    referenceSolution: `int stackPush(ArrayStack *s, int value) {
+    referenceSolution: `#include <stdio.h>
+#define STACK_CAP 8
+
+typedef struct {
+    int data[STACK_CAP];
+    int top;   /* 指向栈顶元素的下一个空位 */
+} ArrayStack;
+
+int stackPush(ArrayStack *s, int value) {
     if (s->top == STACK_CAP) {
         return -1;
     }
@@ -317,7 +350,16 @@ int cqEnqueue(CircularQueue *q, int value) {
       { stdin: '4\n1 2 0 3\n', expected: '2 3' },
       { stdin: '7\n1 2 3 0 0 4 5\n', expected: '3 4 5' },
     ],
-    referenceSolution: `int cqEnqueue(CircularQueue *q, int value) {
+    referenceSolution: `#include <stdio.h>
+#define QUEUE_CAP 5
+
+typedef struct {
+    int data[QUEUE_CAP];
+    int front;
+    int rear;
+} CircularQueue;
+
+int cqEnqueue(CircularQueue *q, int value) {
     if ((q->rear + 1) % QUEUE_CAP == q->front) {
         return -1;
     }
@@ -380,7 +422,16 @@ TreeNode *bstSearch(TreeNode *root, int value) {
       { stdin: '1\n5\n2\n5 4\n', expected: '1\n-1' },
       { stdin: '0\n\n1\n1\n', expected: '-1' },
     ],
-    referenceSolution: `TreeNode *bstSearch(TreeNode *root, int value) {
+    referenceSolution: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct TreeNode {
+    int data;
+    struct TreeNode *left;
+    struct TreeNode *right;
+} TreeNode;
+
+TreeNode *bstSearch(TreeNode *root, int value) {
     while (root != NULL) {
         if (value == root->data) {
             return root;
@@ -591,7 +642,9 @@ size_t myStrlen(const char *s) {
       { stdin: '\n', expected: '0' },
       { stdin: 'x\n', expected: '1' },
     ],
-    referenceSolution: `size_t myStrlen(const char *s) {
+    referenceSolution: `#include <stddef.h>
+
+size_t myStrlen(const char *s) {
     size_t len = 0;
     while (s[len] != '\\0') {
         len++;
