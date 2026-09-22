@@ -1,8 +1,8 @@
-# FINAL_REPORT.md — CuinCStructLab v1.0
+# FINAL_REPORT.md — CuinCStructLab v1.0（P14 加固后为 v1.0.1，见 P14_FINAL_REPORT.md）
 
 ## 项目最终状态
 
-**v1.0 达成。** 面向 C 语言初学者的数据结构学习、可视化、代码实践与刷题平台已按 ROADMAP P0–P13 全部完成：265 个测试全绿、lint/typecheck/production build 通过、Electron 冒烟通过、数据本地持久化经"模拟重启"测试验证。
+**v1.0 达成，P14 Release Hardening 后为 v1.0.1。** 面向 C 语言初学者的数据结构学习、可视化、代码实践与刷题平台已按 ROADMAP P0–P13 全部完成，并经 P14 安全与质量加固：364 个测试用例（353 通过 + 11 项 gcc 集成由 CI Ubuntu 全量执行）、coverage 门禁（85/80/85/85）、CI workflow、Windows 打包（NSIS + Portable）实际启动验证。
 
 - GitHub：https://github.com/yangxijia111/CuinCStructLab（main 分支，随每个 Phase 推送）
 - 质量门禁：`npm run verify` = lint + typecheck + test + build 一键全绿

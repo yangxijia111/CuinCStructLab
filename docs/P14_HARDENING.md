@@ -143,3 +143,21 @@
 
 - 本地 Windows 无 gcc/clang/cl（`which` 确认）→ gcc 集成验证由 GitHub Actions Ubuntu job 执行；本地用 Node 充当"可执行程序"覆盖 runner-core 的超时/输出限制/duration 逻辑。
 - vitest `--reporter=basic` 已废弃（v5），CI 一律用默认 reporter。
+
+## 最终验证记录（2026-09-22，全部通过）
+
+| 步骤 | 结果 |
+| --- | --- |
+| lint / typecheck | ✅ 0 errors |
+| test | ✅ 34 files / **353 passed** + 11 gcc 集成（CI Ubuntu 全量执行）= **364 用例** |
+| coverage | ✅ thresholds 85/80/85/85 达标（CI 真正执行） |
+| build | ✅（含 CSP meta 注入） |
+| electron smoke | ✅ SMOKE-OK（app:// 协议加载生产构建） |
+| electron:build | ✅ `CuinCStructLab-Setup-1.0.1.exe` + `CuinCStructLab-Portable-1.0.1.exe`；打包产物实际启动验证通过 |
+| 版本 | package.json = **1.0.1**；tag `v1.0.1` 新增（v1.0 未动） |
+
+### 修复过程中的连带发现（同样已修复）
+
+16. `getDb()` 并发双开实例 + reset 期间挂起 open 的"复活"（openToken 代次）。
+17. 防抖窗口内关闭页面丢数据（beforeunload/visibilitychange 强制 flush + resetDbSingleton 先 flush）。
+18. coverage 插桩使性能断言变慢 ~2x（`COVERAGE_RUN=1` 环境区分阈值：普通 200ms / 插桩 500ms，算法实现未改动）。

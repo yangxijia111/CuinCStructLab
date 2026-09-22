@@ -2,6 +2,38 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式，版本遵循语义化。
 
+## [1.0.1] — 2026-09-22（Release Hardening）
+
+### Fixed
+- **p-stack-push 错误 expected**：第 2 组用例期望由 `1 2 3 4 5 6 7 8` 修正为 `1 2 3 4 5 6 7`（栈满 push 忽略 + pop 弹出栈顶 8）；真 gcc 验证通过。
+- **章节完成状态降级**：done 章节复习时不再被重置为 learning（内存态与 SQL 均保持 done 单调终态）。
+- **持久化 flush 竞态**：保存期间的新写入不再被旧 flush 清掉 dirty（revision 计数 + flush 串行链 + while-dirty 循环），压力测试 100 连写丢失场景修复。
+- **「清空全部数据」**：Web/Electron 统一 `resetDatabase()`——先关闭连接再删除底层介质（IndexedDB 库 / userData 文件），UI 状态同步清空；此前 Electron 下完全无效、Web 下连接未关可能阻塞。
+- **知识掌握度系统**：统计基于知识点注册表全集（未做题的知识点也参与）；章节关联不再依赖 `chapter.title === knowledgePoint`；错题手动掌握按 exerciseId 精确关联。
+- **教学复杂度描述**：单链表不再孤立宣称"插入删除 O(1)"（明确接线 O(1)/定位 O(n)）；树章节补平衡/平均与最坏退化说明。
+- **getDb 并发双开**：并发调用复用同一 open promise；open 代次 token 防 reset 期间旧实例"复活"；关闭前 flush 防抖窗口内的修改。
+
+### Security
+- Electron 加固：`webSecurity`/`sandbox`/`contextIsolation` 全开启；生产构建经 `app://` 标准协议加载（替代 `file://` + 关同源限制）；CSP（响应头 + 构建产物 meta）；`setWindowOpenHandler` 全拒 + `will-navigate` 白名单；`app://` 路径穿越防护。
+- IPC 参数验证（渲染层不可信）：`db:save` 仅接受 Uint8Array ≤64MB；`runner:compileAndRun` 全字段验证（kind 白名单/长度上限/cases ≤100/timeLimitMs ∈ [100,30000]）。
+- preload 最小暴露（7 个函数）；SECURITY.md 更新加固清单。
+
+### Changed
+- **Runner 统一**：全部编译/运行逻辑唯一收敛到 `electron/runner-core.cjs`（消除 TS/CJS 双实现漂移：MSVC `/Fe:` 参数、探测回退、输出限幅）；`durationMs` 从恒 0 改为 `performance.now()` 真实计时。
+- **自定义编译器链路**：设置页浏览（chooseCompilerPath）→ 检测并保存 → 显示类型/路径/版本 → 持久化（重启恢复）→ CodingPage 使用；失效自动回退 PATH 探测并提示。
+- **退出落盘**：beforeunload/visibilitychange 强制 flush；防抖窗口内关闭页面不再丢数据。
+
+### Added
+- **真实 gcc 集成测试**（CI Ubuntu 强制执行）：全部 10 题 referenceSolution 编译运行全用例 Accepted；覆盖 WA/CE/RE/TLE、无限循环终止、输出洪泛限幅、stdin、Unicode、临时目录清理。
+- **数据导入**：schema/版本校验（损坏 JSON/未来版本/非法字段拒绝）→ 预览 → 自动备份 → 事务导入（失败回滚零破坏）。
+- **知识点注册表**（KnowledgePointRegistry）：id/name/chapters/tags/relatedExerciseIds/relatedLabId。
+- **CI workflow**：Node 20/22 矩阵（lint/typecheck/test/coverage/build/smoke）+ ubuntu gcc-runner job + windows package job（electron-builder Artifact）。
+- **coverage 门禁真正执行**：thresholds 85/80/85/85 未达标即失败。
+- **Windows 打包**：electron-builder（NSIS 安装包 + Portable，x64），打包产物实际启动 Smoke 通过。
+- **可访问性**：统一 `:focus-visible` 键盘焦点环；响应式断点（≤1024px/≤900px）不裁切关键内容。
+- **教学准确性守卫测试**（7 例静态断言防回归）。
+- MIT LICENSE 文件（与 README 声明一致）。
+
 ## [Unreleased]
 
 ### Added

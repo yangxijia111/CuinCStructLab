@@ -44,7 +44,7 @@ export function AppLayout(): React.ReactElement {
             </NavLink>
           ))}
         </nav>
-        <footer className="sidebar-foot">v1.0 · 本地学习，无需联网</footer>
+        <footer className="sidebar-foot">v1.0.1 · 本地学习，无需联网</footer>
       </aside>
       <div className="main-area">
         <header className="topbar">

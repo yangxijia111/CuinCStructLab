@@ -15,7 +15,7 @@ import { SettingsPage } from '../src/pages/SettingsPage';
 // fake-indexeddb 在 setup.ts 全局注入
 
 beforeEach(async () => {
-  resetDbSingleton();
+  await resetDbSingleton();
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase('cclab');
     req.onsuccess = (): void => resolve();

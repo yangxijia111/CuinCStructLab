@@ -261,7 +261,7 @@ export function SettingsPage(): React.ReactElement {
 
       <section className="panel settings-section">
         <h3>关于</h3>
-        <p className="empty-hint">CuinCStructLab v1.0 · 面向 C 语言初学者的数据结构学习平台 · 本地运行，无需联网</p>
+        <p className="empty-hint">CuinCStructLab v1.0.1 · 面向 C 语言初学者的数据结构学习平台 · 本地运行，无需联网</p>
       </section>
     </div>
   );
