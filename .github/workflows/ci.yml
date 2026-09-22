@@ -61,10 +61,14 @@ jobs:
       - name: Electron smoke (production build via app:// protocol)
         if: runner.os == 'Windows'
         run: npm run electron:smoke
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
 
   gcc-runner:
-    name: GCC runner integration (all coding problems)
+    name: Differential + judge (Ubuntu GCC)
     runs-on: ubuntu-latest
+    env:
+      CCLAB_DIFF_COMPILER: gcc
     steps:
       - uses: actions/checkout@v4
 
@@ -85,15 +89,134 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # gcc 集成测试在 PATH 有 gcc 时全量执行：全部 10 题 referenceSolution
-      # 必须编译运行全部用例 Accepted，另覆盖 WA/CE/RE/TLE/输出洪泛/Unicode/清理
-      - name: Real gcc integration tests
+      # P15 差分：教学 C 代码（真实编译）↔ TS Core 语义一致性
+      # 8 类数据结构 + 7 排序 + 二分查找，各 ≥100 轮固定 seed
+      - name: Differential tests (teaching C vs TS core)
+        run: npx vitest run tests/differential/structures.diff.test.ts
+
+      # gcc 集成测试：全部 10 题 referenceSolution 全 AC + WA/CE/RE/TLE/洪泛/Unicode/清理
+      - name: Real gcc judge integration tests
         run: npx vitest run tests/gcc-integration.test.ts
+
+  clang-runner:
+    name: Differential + judge + consistency (Ubuntu Clang)
+    runs-on: ubuntu-latest
+    env:
+      CCLAB_DIFF_COMPILER: clang
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure clang and gcc are available
+        run: |
+          (clang --version || (sudo apt-get update && sudo apt-get install -y clang && clang --version))
+          test -x "$(command -v clang)"
+          test -x "$(command -v gcc)"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # 同一套差分在 Clang 下必须同样全绿（跨编译器一致）
+      - name: Differential tests (teaching C vs TS core, under clang)
+        run: npx vitest run tests/differential/structures.diff.test.ts
+
+      # 全部 10 题 referenceSolution 在 clang 下全 AC
+      - name: Real clang judge integration tests
+        run: npx vitest run tests/gcc-integration.test.ts
+
+      # GCC ↔ Clang 判题结果一致性（AC/WA/CE/RE 场景）
+      - name: GCC vs Clang judge consistency
+        run: npx vitest run tests/differential/consistency.test.ts
+
+  msvc-runner:
+    name: MSVC integration (Windows cl.exe)
+    runs-on: windows-latest
+    env:
+      CCLAB_DIFF_COMPILER: cl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 初始化 MSVC 开发环境（INCLUDE/LIB/vcvars）——真实 cl 编译，绝不 mock
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Ensure cl.exe is available with dev environment
+        run: |
+          cl 2>&1 | Select-Object -First 2
+          if (-not $env:INCLUDE) { throw "INCLUDE not set: MSVC dev env not initialized" }
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # 全部 10 题 referenceSolution 在真实 cl 下编译运行全 AC
+      - name: Real MSVC judge integration tests
+        run: npx vitest run tests/gcc-integration.test.ts
+
+      # 差分在 MSVC 下运行（教学 C 代码为 C99，cl 以 /std:c11 编译）
+      - name: Differential tests (teaching C vs TS core, under MSVC)
+        run: npx vitest run tests/differential/structures.diff.test.ts
+
+  e2e:
+    name: Electron E2E (Ubuntu + xvfb + gcc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure gcc is available (judge flow E2E needs a real compiler)
+        run: |
+          gcc --version
+          test -x "$(command -v gcc)"
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Build production bundle
+        run: npm run build
+
+      # 真用户流程：启动/课程进度持久化/实验室回放/判题 AC/WA/导入导出
+      - name: Run Electron E2E (Playwright via Electron)
+        run: xvfb-run -a npm run test:e2e
+        env:
+          ELECTRON_DISABLE_SANDBOX: '1'
+          CCLAB_E2E_HAS_COMPILER: '1'
 
   package:
     name: Windows package (electron-builder)
     runs-on: windows-latest
-    needs: verify
+    needs:
+      - verify
+      - gcc-runner
+      - clang-runner
+      - msvc-runner
+      - e2e
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

@@ -127,6 +127,12 @@ ipcMain.handle('app:chooseCompilerPath', async () => {
 
 registerAppProtocolScheme();
 
+// E2E/测试隔离：--user-data-dir=<dir> 覆盖 userData（必须在 app ready 之前）
+const userDataArg = process.argv.find((a) => a.startsWith('--user-data-dir='));
+if (userDataArg !== undefined) {
+  app.setPath('userData', userDataArg.slice('--user-data-dir='.length));
+}
+
 app.whenReady().then(() => {
   attachAppProtocolHandler();
   createWindow();
