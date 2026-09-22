@@ -172,4 +172,8 @@
 
 - 矩阵为 **Node 22/24**：jsdom 30 要求 node ≥22.22（上游已淘汰 Node 20，GitHub Actions 亦标记 Node 20 deprecated）。
 - ubuntu 的 Electron smoke 经 `xvfb-run -a` 提供虚拟显示。
-- CI 运行历史：gcc-runner 首跑即抓到 #19/#20（Run 35670399538 / 35670587448），修复后 Run 35671540020 gcc-runner ✓、Node 22 ✓；#21 修复于 Run 35671927902 起全绿。
+- electron-builder 以 `-p never` 关闭 publish（产物经 upload-artifact 发布，Release 资产另行上传）。
+- **最终 CI run 全绿（5/5 job）**：https://github.com/yangxijia111/CuinCStructLab/actions/runs/35672386465
+  （GCC runner integration ✅ / Verify Node 22 & 24 ubuntu ✅ / Verify Node 22 windows ✅ / Windows package ✅，Artifact `windows-packages` ≈230MB）
+- CI 运行历史：gcc-runner 首跑即抓到 #19/#20（Run 35670399538 / 35670587448）；#21 修复后 35671927902 起全绿。
+- tag `v1.0.1` 指向 CI 全绿后的最终 commit（`005da29`），包含全部修复；`v1.0` 未做任何变动。GitHub Release：https://github.com/yangxijia111/CuinCStructLab/releases/tag/v1.0.1 （含 Setup/Portable 安装包）。
