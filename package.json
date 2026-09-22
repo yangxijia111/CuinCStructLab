@@ -18,7 +18,8 @@
     "electron:build": "npm run build && electron-builder --win --x64 -p never",
     "electron:start": "electron electron/main.cjs",
     "electron:smoke": "electron electron/smoke.cjs",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "bench:snapshot": "vitest run --config vitest.bench.config.ts"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
