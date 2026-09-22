@@ -15,6 +15,9 @@ declare module '../electron/runner-core.cjs' {
     opts: { cwd?: string; timeoutMs: number; stdin?: string },
   ): Promise<ProcessOutcome>;
   export function buildCompileArgs(kind: 'gcc' | 'clang' | 'cl', binaryPath: string, sourcePath: string): string[];
+  export function classifyOutcome(o: ProcessOutcome): 'ok' | 'nonzero_exit' | 'signal' | 'timeout' | 'spawn_error';
+  export const MAX_OUTPUT: number;
+  export const OUTPUT_TRUNCATION_NOTICE: string;
   export function detectCompiler(customPath?: string): Promise<{
     available: boolean;
     reason: string;

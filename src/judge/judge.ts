@@ -13,13 +13,17 @@ export const JUDGE_STATUS_LABELS: Record<JudgeStatus, string> = {
   time_limit_exceeded: 'Time Limit Exceeded',
 };
 
-/** 单个测试用例的运行结果（来自 Runner） */
+/** 单个测试用例的运行结果（来自 Runner；ProcessOutcome 字段为平台无关失败分类依据） */
 export interface CaseRunResult {
   index: number;
   stdin: string;
   expected: string;
   actual: string;
   exitCode: number | null;
+  /** 终止信号（SIGSEGV/SIGABRT/SIGKILL…；null=正常退出）。Windows 异常终止由 runner 映射为非零 exitCode */
+  signal?: string | null;
+  /** 启动失败（spawn error，如可执行文件缺失）：绝不判 Accepted */
+  spawnError?: string | null;
   timedOut: boolean;
   durationMs: number;
 }
@@ -71,14 +75,26 @@ export function judgeSubmission(input: JudgeInput): JudgeOutput {
         compileMessage: '',
       };
     }
-    if (c.exitCode !== null && c.exitCode !== 0) {
+    // 崩溃分类（平台无关）：启动失败 / 信号终止 / 非零退出码 —— 一律 Runtime Error，绝不允许进入输出比对
+    const crashed =
+      (c.spawnError !== null && c.spawnError !== undefined) ||
+      (c.signal !== null && c.signal !== undefined) ||
+      c.exitCode === null ||
+      c.exitCode !== 0;
+    if (crashed) {
+      const why =
+        c.spawnError !== null && c.spawnError !== undefined
+          ? `spawn error = ${c.spawnError}`
+          : c.signal !== null && c.signal !== undefined
+            ? `signal = ${c.signal}`
+            : `exit code = ${String(c.exitCode)}`;
       return {
         status: 'runtime_error',
         failedCase: c,
         diff: null,
         passedCount,
         totalCases,
-        compileMessage: `exit code = ${c.exitCode}`,
+        compileMessage: why,
       };
     }
     if (!outputMatches(c.expected, c.actual)) {

@@ -1,12 +1,13 @@
 /**
- * Runner Core —— 本地 C 编译/运行的唯一 Node 端实现（JUDGE_SPEC §4 / SECURITY.md）。
+ * Runner Core —— 本地 C 编译/运行的唯一 Node 端实现（JUDGE_SPEC §4 / SECURITY.md / COMPILER_ADAPTER_SPEC）。
  * electron/main.cjs（IPC 层）与 Node 测试环境都只调用本模块，禁止再复制 Runner 逻辑。
  *
  * 安全红线：
  *   - 一律 spawn(cmd, args[])，绝不拼接 shell 字符串（防命令注入）
  *   - 文件名固定白名单（main.c / program[.exe]），用户输入只进入文件内容与 stdin
- *   - 独立临时目录 + 用后递归删除；编译/运行超时；Windows 进程树 taskkill /T /F
- *   - stdout/stderr 各限 1MB；payload 全字段校验（渲染层不可信）
+ *   - 独立临时目录 + finally 递归删除（全部分支）；编译/运行超时；整进程树终止
+ *   - stdout/stderr 字节级限幅：最终长度 ≤ MAX_OUTPUT + 固定截断提示长度
+ *   - payload 全字段校验（渲染层不可信）
  *   - 本地 Runner ≠ 安全沙箱（见 SECURITY.md）
  */
 'use strict';
@@ -15,8 +16,11 @@ const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { createCompilerAdapters, detectCompilerAdapter, classifyExit } = require('./compiler-adapters.cjs');
 
-const MAX_OUTPUT = 1024 * 1024; // 1MB
+const MAX_OUTPUT = 1024 * 1024; // 1MB（字节）
+/** 截断提示（固定长度：限幅承诺 = 最终输出 ≤ MAX_OUTPUT + 本提示长度） */
+const OUTPUT_TRUNCATION_NOTICE = '\n[输出超过上限，已截断]';
 const COMPILE_TIMEOUT_MS = 15000;
 const DEFAULT_CASE_TIMEOUT_MS = 5000;
 /** payload 输入上限（渲染层不可信，主进程强制验证） */
@@ -30,6 +34,9 @@ const LIMITS = {
 };
 
 const COMPILER_KINDS = ['gcc', 'clang', 'cl'];
+
+/** 默认适配器集合（真实 spawn 探测） */
+const adapters = createCompilerAdapters();
 
 /**
  * 校验 runner payload（IPC 层与测试共用；返回 ok=false 时 errors 给出全部原因）。
@@ -66,9 +73,9 @@ function validateRunnerPayload(payload) {
         return;
       }
       if (typeof c.stdin !== 'string') errors.push(`cases[${i}].stdin 必须是字符串`);
-      else if (c.stdin.length > LIMITS.MAX_STDIN_CHARS) errors.push(`cases[${i}].stdin 超长（>${LIMITS.MAX_STDIN_CHARS} 字符）`);
+      else if (c.stdin.length > LIMITS.MAX_STDIN_CHARS) errors.push(`cases[${i}].stdin 超长（>${LIMITS.MAX_STDIN_CHARS}）`);
       if (typeof c.expected !== 'string') errors.push(`cases[${i}].expected 必须是字符串`);
-      else if (c.expected.length > LIMITS.MAX_STDIN_CHARS) errors.push(`cases[${i}].expected 超长（>${LIMITS.MAX_STDIN_CHARS} 字符）`);
+      else if (c.expected.length > LIMITS.MAX_STDIN_CHARS) errors.push(`cases[${i}].expected 超长（>${LIMITS.MAX_STDIN_CHARS}）`);
     });
   }
 
@@ -90,153 +97,130 @@ function validateRunnerPayload(payload) {
   };
 }
 
-/** 编译参数统一构造（消除双实现漂移；MSVC /Fe: 与目标文件同段 argv） */
+/** 编译参数：委托 Compiler Adapter（消除本文件内的编译器分支） */
 function buildCompileArgs(kind, binaryPath, sourcePath) {
-  return kind === 'cl'
-    ? ['/nologo', '/W4', '/EHsc', `/Fe:${binaryPath}`, sourcePath]
-    : ['-std=c99', '-Wall', '-O0', '-o', binaryPath, sourcePath];
+  const adapter = adapters[kind];
+  if (adapter === undefined) throw new Error(`未知编译器类型: ${kind}`);
+  return adapter.buildCompileArgs(binaryPath, sourcePath);
 }
 
-/** 探测结果结构 */
-function unavailable(reason, installHint) {
-  return { available: false, reason, installHint, compiler: null };
-}
-
-/** 试运行一条命令收集版本输出；无法执行返回 null */
-function tryExec(cmd, args, timeoutMs = 5000) {
-  return new Promise((resolve) => {
-    let proc;
-    try {
-      proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false });
-    } catch {
-      resolve(null);
-      return;
-    }
-    let out = '';
-    const timer = setTimeout(() => {
-      try { proc.kill(); } catch { /* 已退出 */ }
-      resolve(null);
-    }, timeoutMs);
-    proc.stdout?.on('data', (d) => { out += d.toString(); });
-    proc.on('error', () => { clearTimeout(timer); resolve(null); });
-    proc.on('close', (code) => { clearTimeout(timer); resolve({ code: code === null ? -1 : code, out }); });
-  });
-}
-
-function firstVersionLine(out) {
-  return (out.split('\n')[0] ?? '').trim();
-}
-
-/** 按文件路径猜测编译器类型 */
-function guessKind(compilerPath) {
-  const p = compilerPath.toLowerCase();
-  if (p.includes('clang')) return 'clang';
-  const base = path.basename(p);
-  if (base === 'cl' || base === 'cl.exe') return 'cl';
-  return 'gcc';
+/** 探测编译器：委托 adapter 层（customPath 签名验证 / MSVC 环境提示） */
+async function detectCompiler(customPath, platform = process.platform) {
+  return detectCompilerAdapter(customPath, adapters, platform);
 }
 
 /**
- * 探测编译器：customPath 优先；否则按 gcc → clang → cl 探测 PATH，
- * Windows 下再尝试常见安装位置。返回 RunnerAvailability。
+ * 整进程树终止：
+ *   Windows：taskkill /T /F（作业对象不可用时的标准做法）
+ *   POSIX：子进程以新进程组启动（detached），kill(-pid, SIGKILL) 杀整组
  */
-async function detectCompiler(customPath, platform = process.platform) {
-  const INSTALL_HINT =
-    platform === 'win32'
-      ? 'Windows：安装 MSYS2 或 MinGW-w64 后把 gcc.exe 所在目录加入 PATH'
-      : platform === 'darwin'
-        ? 'macOS：xcode-select --install'
-        : 'Linux：sudo apt install gcc';
-
-  if (customPath !== undefined && customPath !== null && String(customPath).trim() !== '') {
-    const p = String(customPath).trim();
-    if (p.length > LIMITS.MAX_PATH_CHARS) return unavailable('指定的编译器路径超长。', '');
-    const r = await tryExec(p, ['--version']);
-    if (r !== null) {
-      return { available: true, reason: '', installHint: '', compiler: { kind: guessKind(p), path: p, version: firstVersionLine(r.out) } };
-    }
-    return unavailable(`指定的编译器路径无法执行：${p}`, '检查路径是否正确（需可直接执行，如 …/bin/gcc.exe）。');
-  }
-
-  const candidates = [
-    {
-      kind: 'gcc',
-      cmd: 'gcc',
-      winFallbacks: ['C:\\MinGW\\bin\\gcc.exe', 'C:\\msys64\\mingw64\\bin\\gcc.exe', 'C:\\msys64\\ucrt64\\bin\\gcc.exe', 'C:\\TDM-GCC-64\\bin\\gcc.exe'],
-    },
-    { kind: 'clang', cmd: 'clang', winFallbacks: ['C:\\Program Files\\LLVM\\bin\\clang.exe'] },
-    { kind: 'cl', cmd: 'cl', winFallbacks: [] },
-  ];
-  for (const c of candidates) {
-    const args = c.kind === 'cl' ? [] : ['--version'];
-    const r = await tryExec(c.cmd, args);
-    if (r !== null) {
-      return { available: true, reason: '', installHint: '', compiler: { kind: c.kind, path: c.cmd, version: firstVersionLine(r.out) } };
-    }
-    if (platform === 'win32') {
-      for (const p of c.winFallbacks) {
-        const rr = await tryExec(p, args);
-        if (rr !== null) {
-          return { available: true, reason: '', installHint: '', compiler: { kind: c.kind, path: p, version: firstVersionLine(rr.out) } };
-        }
-      }
-    }
-  }
-  return unavailable('未探测到 C 编译器（gcc / clang / MSVC cl）。', `INSTALL_HINT:${INSTALL_HINT}`);
-}
-
-/** Windows：taskkill /T /F 杀整个进程树；其他平台 SIGKILL */
 function killTree(proc) {
-  if (process.platform === 'win32' && proc.pid !== undefined) {
+  if (proc.pid === undefined) return;
+  if (process.platform === 'win32') {
     try {
       spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore', shell: false });
     } catch {
       try { proc.kill(); } catch { /* 已退出 */ }
     }
   } else {
-    try { proc.kill('SIGKILL'); } catch { /* 已退出 */ }
+    try {
+      process.kill(-proc.pid, 'SIGKILL'); // 进程组（detached 保证 pgid == pid）
+    } catch {
+      try { proc.kill('SIGKILL'); } catch { /* 已退出 */ }
+    }
   }
 }
 
-/** 安全执行：数组 argv + 超时杀树 + 双向输出限幅 + 真实耗时 */
+/** 字节级限幅累加器：超出 max 后丢弃，记录 truncated */
+function makeOutputCap(max) {
+  const chunks = [];
+  let total = 0;
+  let truncated = false;
+  return {
+    push(buf) {
+      if (total >= max) {
+        truncated = true;
+        return;
+      }
+      const remaining = max - total;
+      if (buf.length > remaining) {
+        chunks.push(buf.slice(0, remaining));
+        total = max;
+        truncated = true;
+      } else {
+        chunks.push(buf);
+        total += buf.length;
+      }
+    },
+    text() {
+      const body = Buffer.concat(chunks).toString('utf8');
+      return truncated ? body + OUTPUT_TRUNCATION_NOTICE : body;
+    },
+    get truncated() {
+      return truncated;
+    },
+  };
+}
+
+/**
+ * 安全执行：数组 argv + 超时杀树 + 字节级限幅 + ProcessOutcome（平台无关）。
+ * 返回 { exitCode, signal, timedOut, spawnError, durationMs, stdout, stderr }。
+ */
 function execSafe(cmd, args, opts) {
   return new Promise((resolve) => {
+    const posixDetached = process.platform !== 'win32';
     let proc;
     try {
-      proc = spawn(cmd, args, { cwd: opts.cwd, stdio: ['pipe', 'pipe', 'pipe'], shell: false });
+      proc = spawn(cmd, args, {
+        cwd: opts.cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+        detached: posixDetached, // POSIX：独立进程组，超时可 kill(-pgid) 整组终止
+      });
     } catch (err) {
-      resolve({ code: null, stdout: '', stderr: String(err), timedOut: false, durationMs: 0 });
+      resolve({
+        exitCode: null,
+        signal: null,
+        timedOut: false,
+        spawnError: String(err),
+        durationMs: 0,
+        stdout: '',
+        stderr: '',
+      });
       return;
     }
     const started = performance.now();
-    let stdout = '';
-    let stderr = '';
+    const outCap = makeOutputCap(MAX_OUTPUT);
+    const errCap = makeOutputCap(MAX_OUTPUT);
     let killed = false;
     const timer = setTimeout(() => {
       killed = true;
       killTree(proc);
     }, opts.timeoutMs);
-    proc.stdout?.on('data', (d) => {
-      // 限幅：超限后丢弃但继续消费，避免子进程因管道写满而阻塞
-      if (stdout.length < MAX_OUTPUT) stdout += d.toString();
-    });
-    proc.stderr?.on('data', (d) => {
-      if (stderr.length < MAX_OUTPUT) stderr += d.toString();
-    });
+    proc.stdout.on('data', (d) => outCap.push(d));
+    proc.stderr.on('data', (d) => errCap.push(d));
     proc.on('error', (err) => {
       clearTimeout(timer);
-      resolve({ code: null, stdout, stderr: `${stderr}${stderr === '' ? '' : '\n'}${err.message}`, timedOut: killed, durationMs: performance.now() - started });
+      resolve({
+        exitCode: null,
+        signal: null,
+        timedOut: killed,
+        spawnError: err.message,
+        durationMs: performance.now() - started,
+        stdout: outCap.text(),
+        stderr: errCap.text(),
+      });
     });
     proc.on('close', (code, signal) => {
       clearTimeout(timer);
-      // 信号终止（SIGSEGV/SIGABRT/SIGKILL…）时 code 为 null：映射为非零退出码，
-      // 保证"崩溃"不会被误判为通过（timedOut 的 TLE 判定在 judge 层优先于 RE）
       resolve({
-        code: code ?? (signal ? -1 : null),
-        stdout,
-        stderr,
+        exitCode: code === null || code === undefined ? null : code,
+        signal: signal === undefined ? null : signal,
         timedOut: killed,
+        spawnError: null,
         durationMs: performance.now() - started,
+        stdout: outCap.text(),
+        stderr: errCap.text(),
       });
     });
     if (opts.stdin !== undefined && proc.stdin !== null) {
@@ -245,14 +229,20 @@ function execSafe(cmd, args, opts) {
       proc.stdin.write(opts.stdin);
       proc.stdin.end();
     } else {
-      proc.stdin?.end();
+      proc.stdin.end();
     }
   });
 }
 
+/** 失败分类（委托 adapter 层；judge 消费） */
+function classifyOutcome(outcome) {
+  return classifyExit(outcome);
+}
+
 /**
  * 编译并逐用例运行（判题主入口）。
- * 返回 CompileRunOutcome；每个 case 的 durationMs 为真实耗时（performance.now）。
+ * 返回 CompileRunOutcome；每个 case 附 ProcessOutcome 字段（signal/spawnError）。
+ * 全部分支 finally 清理临时目录。
  */
 async function compileAndRun(compiler, userCode, harness, cases, timeLimitMs = DEFAULT_CASE_TIMEOUT_MS) {
   // 主进程/测试环境入口再次验证（纵深防御：本函数也可能被非 IPC 调用方使用）
@@ -268,15 +258,7 @@ async function compileAndRun(compiler, userCode, harness, cases, timeLimitMs = D
   const binaryPath = path.join(dir, process.platform === 'win32' ? 'program.exe' : 'program');
 
   let cleaned = false;
-  const cleanup = async () => {
-    try {
-      await fsp.rm(dir, { recursive: true, force: true });
-      cleaned = true;
-    } catch {
-      cleaned = false;
-    }
-  };
-
+  let outcome = null;
   try {
     await fsp.writeFile(sourcePath, `${v.userCode}\n\n${v.harness}`, 'utf8');
 
@@ -284,15 +266,15 @@ async function compileAndRun(compiler, userCode, harness, cases, timeLimitMs = D
       cwd: dir,
       timeoutMs: COMPILE_TIMEOUT_MS,
     });
-    if (compile.code !== 0) {
-      await cleanup();
-      return {
-        compileExitCode: compile.code ?? -1,
+    if (compile.exitCode !== 0) {
+      outcome = {
+        compileExitCode: compile.exitCode ?? (compile.spawnError !== null ? -2 : -1),
         compileStdout: compile.stdout,
         compileStderr: compile.stderr,
         cases: [],
         cleaned,
       };
+      return outcome;
     }
 
     const results = [];
@@ -303,22 +285,30 @@ async function compileAndRun(compiler, userCode, harness, cases, timeLimitMs = D
         stdin: c.stdin,
         expected: c.expected,
         actual: r.stdout,
-        exitCode: r.code,
+        exitCode: r.exitCode,
+        signal: r.signal,
+        spawnError: r.spawnError,
         timedOut: r.timedOut,
         durationMs: r.durationMs,
       });
     }
-    await cleanup();
-    return {
+    outcome = {
       compileExitCode: 0,
       compileStdout: compile.stdout,
       compileStderr: compile.stderr,
       cases: results,
       cleaned,
     };
-  } catch (err) {
-    await cleanup();
-    throw err;
+    return outcome;
+  } finally {
+    // 所有分支（成功/编译失败/运行异常/throw）都清理临时目录
+    try {
+      await fsp.rm(dir, { recursive: true, force: true });
+      cleaned = true;
+    } catch {
+      cleaned = false;
+    }
+    if (outcome !== null) outcome.cleaned = cleaned;
   }
 }
 
@@ -326,11 +316,13 @@ module.exports = {
   LIMITS,
   COMPILER_KINDS,
   MAX_OUTPUT,
+  OUTPUT_TRUNCATION_NOTICE,
   COMPILE_TIMEOUT_MS,
   DEFAULT_CASE_TIMEOUT_MS,
   validateRunnerPayload,
   buildCompileArgs,
   detectCompiler,
   execSafe,
+  classifyOutcome,
   compileAndRun,
 };

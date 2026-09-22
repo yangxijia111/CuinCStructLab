@@ -12,7 +12,7 @@ const require = createRequire(path.join(process.cwd(), 'package.json'));
 const runnerCorePath = path.join(process.cwd(), 'electron', 'runner-core.cjs');
 // 直接引用主进程同款实现（单一实现原则）
 const runnerCore = require(runnerCorePath) as {
-  execSafe: (cmd: string, args: string[], opts: { cwd?: string; timeoutMs: number; stdin?: string }) => Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }>;
+  execSafe: (cmd: string, args: string[], opts: { cwd?: string; timeoutMs: number; stdin?: string }) => Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }>;
   buildCompileArgs: (kind: 'gcc' | 'clang' | 'cl', binaryPath: string, sourcePath: string) => string[];
 };
 
@@ -44,23 +44,23 @@ export async function runCProgram(source: string, compiler: CCompilerSpec, opts:
       cwd: dir,
       timeoutMs: 30000,
     });
-    if (compile.code !== 0) {
+    if (compile.exitCode !== 0) {
       return {
         ok: false,
-        compileError: `编译失败（exit=${String(compile.code)}）：${compile.stderr.slice(0, 4000)}`,
+        compileError: `编译失败（exit=${String(compile.exitCode)}）：${compile.stderr.slice(0, 4000)}`,
         stdout: compile.stdout,
         stderr: compile.stderr,
-        exitCode: compile.code,
+        exitCode: compile.exitCode,
         timedOut: compile.timedOut,
       };
     }
     const run = await runnerCore.execSafe(binaryPath, [], { cwd: dir, timeoutMs: opts.timeoutMs ?? 30000 });
     return {
-      ok: run.code === 0 && !run.timedOut,
-      compileError: run.timedOut ? 'C 差分程序超时' : run.code !== 0 ? `运行失败 exit=${String(run.code)}` : null,
+      ok: run.exitCode === 0 && !run.timedOut,
+      compileError: run.timedOut ? 'C 差分程序超时' : run.exitCode !== 0 ? `运行失败 exit=${String(run.exitCode)}` : null,
       stdout: run.stdout,
       stderr: run.stderr,
-      exitCode: run.code,
+      exitCode: run.exitCode,
       timedOut: run.timedOut,
     };
   } finally {
@@ -77,7 +77,7 @@ export async function detectCompilerByKind(kind: 'gcc' | 'clang' | 'cl'): Promis
   };
   for (const cmd of candidates[kind]) {
     const probe = await runnerCore.execSafe(cmd, kind === 'cl' ? [] : ['--version'], { timeoutMs: 8000 });
-    if (probe.code === null) continue; // spawn 失败（ENOENT 等）：绝不从错误信息里"认出"编译器
+    if (probe.exitCode === null) continue; // spawn 失败（ENOENT 等）：绝不从错误信息里"认出"编译器
     // gcc/clang 版本在 stdout；MSVC banner 在 stderr。签名匹配防任意 exe 冒充（正式探测走 compiler-adapters）
     const out = kind === 'cl' ? `${probe.stdout}\n${probe.stderr}` : probe.stdout;
     const signature = kind === 'cl' ? /Microsoft/i : kind === 'clang' ? /clang/i : /gcc|Free Software/i;

@@ -29,7 +29,7 @@ const runnerCore = require('../electron/runner-core.cjs') as {
     cmd: string,
     args: string[],
     opts: { cwd?: string; timeoutMs: number; stdin?: string },
-  ): Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }>;
+  ): Promise<{ exitCode: number | null; signal: string | null; timedOut: boolean; spawnError: string | null; stdout: string; stderr: string; durationMs: number }>;
   compileAndRun(
     compiler: CompilerInfo,
     userCode: string,
@@ -119,11 +119,12 @@ describe('runner-core payload 验证（渲染层不可信）', () => {
 });
 
 describe('runner-core 编译参数（单一实现，消除双实现漂移）', () => {
-  it('MSVC：/Fe: 与目标文件同段 argv', () => {
+  it('MSVC：/nologo /W4 /EHsc /std:c11 /Fe:（c11：教学 C 代码用 C99 for 内声明，默认模式不支持）', () => {
     expect(runnerCore.buildCompileArgs('cl', 'C:\\t\\program.exe', 'C:\\t\\main.c')).toEqual([
       '/nologo',
       '/W4',
       '/EHsc',
+      '/std:c11',
       '/Fe:C:\\t\\program.exe',
       'C:\\t\\main.c',
     ]);
@@ -152,7 +153,7 @@ describe('runner-core 编译参数（单一实现，消除双实现漂移）', (
 describe('runner-core 子进程行为（node 作为真实被测程序）', () => {
   it('正常执行：exitCode/stdout 与真实 durationMs', async () => {
     const r = await runnerCore.execSafe(NODE, ['-e', 'console.log("hello-runner")'], { timeoutMs: 10000 });
-    expect(r.code).toBe(0);
+    expect(r.exitCode).toBe(0);
     expect(r.stdout).toBe('hello-runner\n');
     expect(r.timedOut).toBe(false);
     expect(r.durationMs).toBeGreaterThan(0);
@@ -166,8 +167,8 @@ describe('runner-core 子进程行为（node 作为真实被测程序）', () =>
 
   it('信号崩溃映射为非零退出码（RE 判定依据；null code 不得视为通过）', async () => {
     const r = await runnerCore.execSafe(NODE, ['-e', 'process.kill(process.pid, "SIGSEGV")'], { timeoutMs: 10000 });
-    expect(r.code).not.toBeNull();
-    expect(r.code).not.toBe(0);
+    expect(r.exitCode).not.toBeNull();
+    expect(r.exitCode).not.toBe(0);
   });
 
   it('stdout 超限截断（限幅后不再增长）', async () => {
