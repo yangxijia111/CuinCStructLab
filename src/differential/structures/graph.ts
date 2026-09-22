@@ -89,6 +89,7 @@ function generateC(cases: DifferentialCase[]): string {
         throw new Error(`graph C: 未知操作 ${op.op}`);
       }
     }
+    lines.push(`        printf("SIZE:${labels.length}\\n");`);
     lines.push('    }');
     lines.push(`    printf("END ${ci}\\n");`);
   });
