@@ -77,7 +77,7 @@ npm run electron:smoke  # Electron 冒烟（app:// 协议加载生产构建）
 
 ## Release
 
-- 当前版本：**v1.0.1**（见 [docs/CHANGELOG.md](docs/CHANGELOG.md)）。
+- 当前版本：**v1.1.0**（见 [docs/CHANGELOG.md](docs/CHANGELOG.md)）。
 - Windows x64 安装包（NSIS）与 Portable 由 CI 的 `package` job 构建并上传 Artifact；本地可用 `npm run electron:build` 构建。
 - 发布产物不入 Git。
 

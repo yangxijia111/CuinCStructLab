@@ -1,7 +1,7 @@
 {
   "name": "cuincstructlab",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "CuinCStructLab — 面向 C 语言初学者的数据结构学习、可视化、代码实践与刷题平台",
   "type": "module",
   "scripts": {

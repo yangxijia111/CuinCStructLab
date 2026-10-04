@@ -35,6 +35,29 @@
 - **教学准确性守卫测试**（7 例静态断言防回归）。
 - MIT LICENSE 文件（与 README 声明一致）。
 
+## [1.1.0] — 2026-09-22（Semantic Correctness & Runner Reliability）
+
+### Added
+- **差分测试框架**（`src/differential/` + `tests/differential/`）：教学 C 代码（真实编译）↔ TS Core 的**语义级一致性验证**。覆盖顺序表/单链表/双向链表/顺序栈/循环队列/BST/Heap（max+min 对偶）/Graph DFS+BFS/7 种排序/二分查找；每结构 ≥100 轮固定 seed（mulberry32）随机操作序列，排序每算法 ≥100 组输入（空/单/已序/逆序/全重复/负数/随机/大重复率）。C 侧 = 各模块教学 C 代码本身（Harness 自动生成、STATE 行协议机器可解析、批量单编译）；语义归一化只比值序列/观察序列，不比地址/节点 id。
+- **Compiler Adapter 架构**（`electron/compiler-adapters.cjs`）：Gcc/Clang/Msvc 统一接口（versionArgs/parseVersion/buildCompileArgs/probe/supports/getEnvironmentInfo/classifyExit）；探测函数可注入（mock 测试）。MSVC 参数新增 `/std:c11`（教学代码用 C99 语法）。
+- **跨平台 CI**：clang job（差分 + 判题 + **GCC↔Clang 判题一致性**含 AC/WA/CE/RE）、MSVC job（ilammy/msvc-dev-cmd 真实 cl：全部 10 题 + 差分）、Electron E2E job（xvfb + gcc）；package 依赖全部关键 job（编译器测试失败不再产出 Release 包）。
+- **Playwright Electron E2E**（`tests/e2e/`，6 场景真用户流程）：启动/课程进度跨重启持久化/实验室单链表回放（Next/Previous/Jump 终态 10 15 20 30）/判题 Accepted/判题 Wrong Answer/导出→清空→导入恢复；`--user-data-dir` 隔离。
+- **Snapshot Engine 审计**（`docs/SNAPSHOT_ENGINE_AUDIT.md`）：n=16..256 实测（selection n=256 单操作 653MB 序列化/873MB heap，整体 JSON.stringify 超 V8 字符串上限）；教学规模（UI 上限 40）<1s/<100MB，**保持 v1 不重构**，v2 触发条件写入 Known Limitations。
+- P15 设计文档：`P15_SEMANTIC_CORRECTNESS.md` / `COMPILER_ADAPTER_SPEC.md` / `DIFFERENTIAL_TEST_SPEC.md`。
+
+### Fixed
+- **spawn error 可被误判 Accepted**（实证：expected 为空 + 启动失败 → accepted）：judge 现按 ProcessOutcome 分类，`spawn_error`/`signal`/非零退出码一律 Runtime Error，绝不进入输出比对。
+- **输出限幅单 chunk 超限**：`if (len < MAX) += chunk` 改为字节级累加器（Buffer slice + 固定截断提示），最终输出恒 ≤ `MAX_OUTPUT + 提示长度`（8MB 单块/双向洪泛测试覆盖）。
+- **POSIX 进程树泄漏**：子进程以独立进程组启动（detached），超时 `kill(-pgid, SIGKILL)` 整组终止（孙进程心跳测试验证；Windows 沿用 taskkill /T /F）。
+- **cleanup 全分支化**：临时目录清理移入 finally（编译失败/运行失败/超时/信号/异常 throw 均覆盖）。
+- **`app://` 路径穿越**：`startsWith(DIST_ROOT)` 前缀判断（兄弟目录 `dist-evil` 可穿越，已证伪）→ `path.relative` 判定 + 拒绝 `..`/绝对路径/NUL/非法编码；纯函数抽出可单测（13 用例含 `%2e%2e`/混合大小写/嵌套穿越）。
+- **customPath 探测缺陷**：不再对所有编译器统一 `--version`（cl 不支持）；版本结论由**签名匹配**决定（任意 exe 无法冒充，路径名只影响尝试顺序）；MSVC banner 从 stderr 解析；cl 存在但 INCLUDE/LIB 未初始化 → 明确"MSVC 开发环境未初始化"提示，不再误判可用。
+- README Node 版本与实际依赖对齐（`>=22.22`，jsdom 30 的最低要求； engines 声明同步）。
+
+### Changed
+- **ProcessOutcome 平台无关抽象**：execSafe 返回 `{exitCode, signal, timedOut, spawnError, durationMs}`；信号语义 POSIX 报 signal、Windows 映射非零退出码（0xC0000005），judge 消费 `classifyOutcome`。
+- **二分查找重复值规范裁决**（any-match：返回某个匹配下标）：JUDGE_SPEC/DATA_STRUCTURE_SPEC/第 12 章教学内容同步。
+
 ## [Unreleased]
 
 ### Added
