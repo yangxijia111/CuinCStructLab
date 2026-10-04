@@ -11,11 +11,29 @@ export function findLine(code: readonly string[], needle: string, from = 0): num
   return 0;
 }
 
+/**
+ * needle 规格：
+ * - 字符串：全文找第一处包含；
+ * - [文本, 锚文本]：先定位锚文本所在行，再从该行（含）起查找文本。
+ *   用于同一文本在多个函数中重复出现的场景（如各遍历函数里的判空行）。
+ */
+export type LineNeedle = string | readonly [text: string, anchor: string];
+
 /** 由若干 needle 构建行号表（模块加载时一次性计算） */
-export function buildLineMap<M extends string>(code: readonly string[], needles: Record<M, string>): Record<M, number> {
+export function buildLineMap<M extends string>(code: readonly string[], needles: Record<M, LineNeedle>): Record<M, number> {
   const result = {} as Record<M, number>;
   for (const key of Object.keys(needles) as M[]) {
-    result[key] = findLine(code, needles[key]!);
+    const spec = needles[key]!;
+    if (typeof spec === 'string') {
+      result[key] = findLine(code, spec);
+    }
+  }
+  for (const key of Object.keys(needles) as M[]) {
+    const spec = needles[key]!;
+    if (typeof spec !== 'string') {
+      const anchorLine = findLine(code, spec[1]);
+      result[key] = anchorLine === 0 ? 0 : findLine(code, spec[0], anchorLine - 1);
+    }
   }
   return result;
 }

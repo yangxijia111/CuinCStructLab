@@ -241,7 +241,7 @@ function bubbleSteps(arr: number[]): SortStepsResult {
           type: 'swap',
           title: `a[${j}]=${x[j]} > a[${j + 1}]=${x[j + 1]}：交换`,
           description: `前面的更大，交换位置，大值往后冒。`,
-          codeLine: 6,
+          codeLine: 7,
           highlight: [`a${j}`, `a${j + 1}`],
           mutate: (s) => {
             clearFlags(s);
@@ -274,7 +274,7 @@ function bubbleSteps(arr: number[]): SortStepsResult {
         type: 'info',
         title: '一整趟没有交换：数组已经有序，提前结束',
         description: '冒泡排序对已有序输入可以达到 O(n) 的优化。',
-        codeLine: 15,
+        codeLine: 14,
         mutate: (s) => {
           for (const c of s.cells) c.flags = ['sorted'];
         },
@@ -297,7 +297,7 @@ function selectionSteps(arr: number[]): SortStepsResult {
       type: 'info',
       title: `第 ${i + 1} 轮：在 [${i}, ${n - 1}] 里找最小值`,
       description: `前 ${i} 个已就位。先假设 a[${i}] 是最小的。`,
-      codeLine: 3,
+      codeLine: 4,
       mutate: (s) => {
         clearFlags(s);
         for (let k = 0; k < i; k++) s.cells[k]!.flags = ['sorted'];
@@ -307,18 +307,19 @@ function selectionSteps(arr: number[]): SortStepsResult {
     for (let j = i + 1; j < n; j++) {
       ctx.counters.comparisons++;
       const x = valuesOf(ctx.rec.state);
+      const prevMin = min;
       const smaller = x[j]! < x[min]!;
       if (smaller) min = j;
       record(ctx, {
         type: 'compare',
-        title: `a[${j}]=${x[j]} ${smaller ? '<' : '>='} 当前最小 a[${min}]=${x[min]}`,
+        title: `a[${j}]=${x[j]} ${smaller ? '<' : '>='} 当前最小 a[${prevMin}]=${x[prevMin]}`,
         description: smaller ? `发现更小的，最小值下标更新为 ${j}。` : '不是更小，继续。',
-        codeLine: 7,
-        highlight: [`a${j}`, `a${min}`],
+        codeLine: 6,
+        highlight: [`a${j}`, `a${prevMin}`],
         mutate: (s) => {
           clearFlags(s);
           for (let k = 0; k < i; k++) s.cells[k]!.flags = ['sorted'];
-          s.cells[min]!.flags = ['pivot'];
+          s.cells[prevMin]!.flags = ['pivot'];
           s.cells[j]!.flags = ['comparing'];
         },
       });
@@ -364,7 +365,7 @@ function insertionSteps(arr: number[], gap: number, ctx?: Ctx, shellRound?: numb
   const own = ctx === undefined;
   const c = own ? makeRecorder(arr, '插入排序') : ctx;
   const n = arr.length;
-  const codeLineBase = gap === 1 ? 3 : 4;
+  const codeLineBase = gap === 1 ? 4 : 5;
   for (let i = gap; i < n; i++) {
     const x = valuesOf(c.rec.state);
     const key = x[i]!;
@@ -398,7 +399,7 @@ function insertionSteps(arr: number[], gap: number, ctx?: Ctx, shellRound?: numb
           type: 'assign',
           title: `a[${j}]=${xv[j]} > key=${key}：a[${j + gap}] = a[${j}]（右移一格）`,
           description: '比 key 大的元素整体右移，腾出空位。',
-          codeLine: gap === 1 ? 6 : 7,
+          codeLine: gap === 1 ? 7 : 8,
           highlight: [`a${j}`, `a${j + gap}`],
           mutate: (s) => {
             clearFlags(s);
@@ -427,7 +428,7 @@ function insertionSteps(arr: number[], gap: number, ctx?: Ctx, shellRound?: numb
       type: 'assign',
       title: `a[${j + gap}] = ${key}（放进空位）`,
       description: '插入完成，前 i+1 个元素有序。',
-      codeLine: gap === 1 ? 9 : 10,
+      codeLine: gap === 1 ? 10 : 11,
       highlight: [`a${j + gap}`],
       mutate: (s) => {
         clearFlags(s);
@@ -481,7 +482,7 @@ function mergeSteps(arr: number[]): SortStepsResult {
       type: 'info',
       title: `分解 [${left}, ${right}] → [${left}, ${mid}] 和 [${mid + 1}, ${right}]`,
       description: '递归排序左右两半，然后合并。',
-      codeLine: 25,
+      codeLine: 22,
       mutate: (s) => {
         clearFlags(s, false);
         s.range = [left, right];
@@ -541,7 +542,7 @@ function mergeSteps(arr: number[]): SortStepsResult {
       type: 'assign',
       title: `把合并结果写回 [${left}, ${right}]：[${merged.join(', ')}]`,
       description: '临时数组按顺序写回原数组对应区间。',
-      codeLine: 16,
+      codeLine: 14,
       mutate: (s) => {
         merged.forEach((v, k) => {
           s.cells[left + k]!.value = v;
@@ -571,7 +572,7 @@ function quickSteps(arr: number[]): SortStepsResult {
       title: `对 [${low}, ${high}] 分区，基准 pivot = a[${high}] = ${pivotValue}`,
       description: `目标：比 ${pivotValue} 小的都去左边，大的都去右边，基准放到分界点。`,
       beginnerNote: 'i 维护"小于区"的右边界：i 左边的全部 < pivot。j 扫描每个元素，发现小的就交换到小于区。',
-      codeLine: 2,
+      codeLine: 3,
       mutate: (s) => {
         clearFlags(s, false);
         for (let k = low; k <= high; k++) s.cells[k]!.flags = ['inRange'];
@@ -643,7 +644,7 @@ function quickSteps(arr: number[]): SortStepsResult {
         type: 'swap',
         title: `基准归位：a[${p}] ↔ a[${high}]，pivot=${pivotValue} 落在下标 ${p}`,
         description: `现在 a[${p}] 左边全 < ${pivotValue}，右边全 >= ${pivotValue}，它已就位。`,
-        codeLine: 12,
+        codeLine: 11,
         highlight: [`a${p}`, `a${high}`],
         mutate: (s) => {
           clearFlags(s, false);
@@ -695,7 +696,7 @@ function heapSortSteps(arr: number[]): SortStepsResult {
         type: 'swap',
         title: `下滤：a[${i}]=${x[i]} 与孩子中更大的 a[${best}]=${x[best]} 交换`,
         description: `父节点 (i-1)/2、孩子 2i+1/2i+2。交换后继续向下检查。`,
-        codeLine: 3,
+        codeLine: 15,
         highlight: [`a${i}`, `a${best}`],
         mutate: (s) => {
           clearFlags(s);

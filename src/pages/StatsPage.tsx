@@ -40,8 +40,11 @@ export function StatsPage(): React.ReactElement {
         .filter((w) => w.mastered)
         .map((w) => w.exerciseId),
     );
+    // 掌握度只统计近 30 天的答题（DATA_SPEC §5"近期正确率"），一年前的旧记录不稀释当前水平
+    // eslint-disable-next-line react-hooks/purity -- 统计快照依赖当前时刻，Date.now 属预期
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const kpStats = computeKnowledgePointStats({
-      attempts: attempts.map((a) => ({ exerciseId: a.exerciseId, correct: a.correct })),
+      attempts: attempts.filter((a) => a.createdAt >= cutoff).map((a) => ({ exerciseId: a.exerciseId, correct: a.correct })),
       studiedChapters: studiedChapterIds,
       masteredExerciseIds,
     });

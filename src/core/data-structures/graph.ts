@@ -78,7 +78,7 @@ export const GRAPH_C_CODE: string[] = [
   '}',
 ];
 
-const L = buildLineMap(GRAPH_C_CODE, {
+export const L = buildLineMap(GRAPH_C_CODE, {
   addEdgeFn: 'void mgAddEdge(',
   addEdgeWrite: 'g->matrix[u][v] = 1;',
   removeEdgeFn: 'void mgRemoveEdge(',
@@ -259,11 +259,16 @@ export function graphRemoveEdge(state: GraphState, u: string, v: string, directe
   rec.record({
     type: 'delete',
     title: `删除边 ${u} - ${v}`,
-    description: isDirected ? '' : '无向图两个方向的记录一起清零。',
+    description: isDirected ? '有向图只删除 u → v 这一个方向的记录。' : '无向图两个方向的记录一起清零。',
     codeLine: L.removeEdgeWrite,
     highlight: [u, v],
     mutate: (s) => {
-      s.edges = s.edges.filter((e) => !(e.from === u && e.to === v) && !(e.from === v && e.to === u));
+      // 有向图中 u→v 与 v→u 是两条独立的边，只删指定方向；无向图边成对存储，双向一起删
+      if (isDirected) {
+        s.edges = s.edges.filter((e) => !(e.from === u && e.to === v));
+      } else {
+        s.edges = s.edges.filter((e) => !(e.from === u && e.to === v) && !(e.from === v && e.to === u));
+      }
     },
   });
   return rec.finish();

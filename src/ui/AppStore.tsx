@@ -45,6 +45,8 @@ export interface AppStoreValue {
   storageReady: boolean;
   /** 存储层错误（显示常驻横幅） */
   storageError: string | null;
+  /** 关闭存储错误横幅（已知晓错误后手动清除） */
+  dismissStorageError(): void;
   theme: Theme;
   setTheme(theme: Theme): void;
   beginnerMode: boolean;
@@ -68,6 +70,8 @@ export interface AppStoreValue {
   /** 自定义编译器路径（空串 = 自动探测；持久化，重启恢复） */
   compilerPath: string;
   setCompilerPath(path: string): void;
+  /** 直连数据库执行写操作（失败进 storageError 横幅；CodingPage 提交记录等场景使用） */
+  withDb(fn: (db: AppDatabase) => void): void;
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
@@ -105,9 +109,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
   // 启动：加载 SQLite 并恢复状态
   useEffect(() => {
     let cancelled = false;
+    const bootAt = Date.now(); // 加载期间用户可能已乐观写入内存态，恢复时不得覆盖
     void (async () => {
       try {
         const db = await getDb();
+        // 持久化（防抖落盘）失败必须进 storageError 横幅，绝不静默丢数据（NFR-06）
+        db.persistErrorHandler = (err: unknown) => {
+          setStorageError(`数据保存失败：${err instanceof Error ? err.message : String(err)}`);
+        };
         if (cancelled) return;
         const p: Record<number, ChapterProgress> = {};
         const rows: ChapterProgressRow[] = Object.values(repos.loadChapterProgress(db));
@@ -119,8 +128,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
             maxSectionIndex: row.maxSectionIndex,
           };
         }
-        setProgress(p);
+        // 合并：DB 恢复值 + 加载窗口内（>= bootAt）的内存乐观写入
+        setProgress((prev) => {
+          const merged = { ...p };
+          for (const [ch, cur] of Object.entries(prev)) {
+            if (cur.lastVisitAt >= bootAt) merged[Number(ch)] = cur;
+          }
+          return merged;
+        });
         const { ALL_EXERCISES } = await import('../exercises/bank');
+        if (cancelled) return;
         const meta = new Map(ALL_EXERCISES.map((e) => [e.id, e]));
         const at: AttemptRecord[] = repos.loadAttempts(db).map((r) => ({
           exerciseId: r.exerciseId,
@@ -130,14 +147,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
           userAnswer: r.userAnswer,
           createdAt: r.createdAt,
         }));
-        setAttempts(at);
+        setAttempts((prev) => [...at, ...prev.filter((x) => x.createdAt >= bootAt)]);
         const wb: Record<string, WrongItem> = {};
         for (const row of Object.values(repos.loadWrongBook(db))) {
           wb[row.exerciseId] = enrichWrong(row, meta);
         }
-        setWrongBook(wb);
-        setNotes(repos.loadNotes(db));
-        setFavorites(repos.loadFavorites(db));
+        setWrongBook((prev) => {
+          const merged = { ...wb };
+          for (const [id, cur] of Object.entries(prev)) {
+            if (cur.lastWrongAt >= bootAt) merged[id] = cur;
+          }
+          return merged;
+        });
+        setNotes((prev) => ({ ...repos.loadNotes(db), ...prev }));
+        setFavorites((prev) => [...repos.loadFavorites(db), ...prev]);
         const settings = repos.loadSettings(db);
         if (settings.theme === 'light' || settings.theme === 'dark') {
           setThemeState(settings.theme);
@@ -182,6 +205,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       .catch((err: unknown) => {
         setStorageError(`数据保存失败：${err instanceof Error ? err.message : String(err)}`);
       });
+  }, []);
+
+  const dismissStorageError = useCallback((): void => {
+    setStorageError(null);
   }, []);
 
   const setTheme = useCallback(
@@ -338,7 +365,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
 
   /** 清空全部数据：删除底层数据库（Web/Electron 统一走 backend.reset）+ 全部内存态复位 */
   const resetAllData = useCallback(async (): Promise<void> => {
-    await resetDatabase();
+    const db = await resetDatabase();
+    db.persistErrorHandler = (err: unknown) => {
+      setStorageError(`数据保存失败：${err instanceof Error ? err.message : String(err)}`);
+    };
     setProgress({});
     setAttempts([]);
     setWrongBook({});
@@ -347,6 +377,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
     setThemeState('dark');
     document.documentElement.dataset.theme = 'dark';
     setBeginnerModeState(false);
+    setCompilerPathState(''); // 内存态同步复位，否则设置页仍显示旧路径直到重启
     setStorageError(null);
   }, []);
 
@@ -354,6 +385,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
     () => ({
       storageReady,
       storageError,
+      dismissStorageError,
       theme,
       setTheme,
       beginnerMode,
@@ -374,10 +406,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       resetAllData,
       compilerPath,
       setCompilerPath,
+      withDb,
     }),
     [
       storageReady,
       storageError,
+      dismissStorageError,
       theme,
       setTheme,
       beginnerMode,
@@ -398,6 +432,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
       resetAllData,
       compilerPath,
       setCompilerPath,
+      withDb,
     ],
   );
 

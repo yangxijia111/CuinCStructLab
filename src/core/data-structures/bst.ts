@@ -95,7 +95,7 @@ export const BST_C_CODE: string[] = [
   '}',
 ];
 
-const L = buildLineMap(BST_C_CODE, {
+export const L = buildLineMap(BST_C_CODE, {
   insertMalloc: 'TreeNode *node = (TreeNode *)malloc(sizeof(TreeNode));',
   insertLess: 'root->left = bstInsert(root->left, value);',
   insertGreater: 'root->right = bstInsert(root->right, value);',

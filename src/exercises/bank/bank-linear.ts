@@ -164,7 +164,7 @@ export const LINEAR_BANK: Exercise[] = [
     knowledgePoint: '循环复杂度',
     difficulty: 2,
     type: 'single',
-    question: '```c\nfor (int i = 0; i < n; i *= 2) …  /* 循环体 O(1) */\n```（i 初值 1）\n这段循环的复杂度是？',
+    question: '```c\nfor (int i = 1; i < n; i *= 2) …  /* 循环体 O(1) */\n```\n这段循环的复杂度是？',
     options: [
       { id: 'A', text: 'O(n)' },
       { id: 'B', text: 'O(log n)' },

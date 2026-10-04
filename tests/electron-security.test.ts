@@ -6,8 +6,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'node:module';
 
 const read = (p: string): string => readFileSync(resolve(process.cwd(), 'electron', p), 'utf8');
+const requireCjs = createRequire(resolve(process.cwd(), 'package.json'));
 
 describe('Electron 渲染层安全（main.cjs）', () => {
   const src = read('main.cjs');
@@ -33,7 +35,9 @@ describe('Electron 渲染层安全（main.cjs）', () => {
 
   it('导航限制：仅允许应用自身与本机开发服务器', () => {
     expect(src).toContain('will-navigate');
-    expect(src).toContain('DEV_URL_ALLOW');
+    // isDevUrl 必须经 URL 解析判定（dev-url.cjs），禁止退回字符串正则（可被 userinfo@ 绕过）
+    expect(src).toContain("require('./dev-url.cjs')");
+    expect(src).not.toMatch(/DEV_URL_ALLOW\s*=/);
   });
 
   it('IPC 参数验证存在：db:save 大小上限 + runner payload 验证', () => {
@@ -45,6 +49,30 @@ describe('Electron 渲染层安全（main.cjs）', () => {
   it('Runner 逻辑不得内联在 IPC 层（单一实现原则）', () => {
     expect(src).toContain("require('./runner-core.cjs')");
     expect(src).not.toContain("require('node:crypto')");
+  });
+});
+
+describe('dev-url 判定（行为测试：userinfo@ 伪装必须被拒）', () => {
+  const { isDevUrl } = requireCjs('./electron/dev-url.cjs') as { isDevUrl: (u: string) => boolean };
+
+  it('放行本机回环开发地址', () => {
+    expect(isDevUrl('http://localhost:5173/')).toBe(true);
+    expect(isDevUrl('http://127.0.0.1:5173/course/1')).toBe(true);
+    expect(isDevUrl('http://localhost:5173')).toBe(true);
+  });
+
+  it('拒绝 userinfo 伪装绕过（真实 host 是远程站点）', () => {
+    expect(isDevUrl('http://127.0.0.1:5173@evil.com/x')).toBe(false);
+    expect(isDevUrl('http://localhost:5173@evil.com/')).toBe(false);
+    expect(isDevUrl('http://user:pass@127.0.0.1:5173/')).toBe(false);
+  });
+
+  it('拒绝远程站点、非 http 协议与畸形 URL', () => {
+    expect(isDevUrl('https://localhost:5173/')).toBe(false);
+    expect(isDevUrl('http://evil.com/')).toBe(false);
+    expect(isDevUrl('http://192.168.1.5:5173/')).toBe(false);
+    expect(isDevUrl('file:///etc/passwd')).toBe(false);
+    expect(isDevUrl('not a url')).toBe(false);
   });
 });
 

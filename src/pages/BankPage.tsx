@@ -13,7 +13,8 @@ import { useAppStore } from '../ui/AppStore';
 export function BankPage(): React.ReactElement {
   const [params] = useSearchParams();
   const chapterParam = params.get('chapter');
-  const [chapter, setChapter] = useState<number | 'all'>(chapterParam !== null ? Number(chapterParam) : 'all');
+  // 空串/非数字/负数一律回退“全部章节”，避免 select value=NaN 无匹配项
+  const [chapter, setChapter] = useState<number | 'all'>(parseChapterParam(chapterParam));
   const [type, setType] = useState<string>('all');
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -230,4 +231,11 @@ function splitCode(question: string): { intro: string; code: string | null } {
   const m = question.match(/```(?:c)?\n?([\s\S]*?)```/);
   if (m === null) return { intro: question, code: null };
   return { intro: question.slice(0, question.indexOf('```')).trim(), code: m[1] ?? '' };
+}
+
+/** ?chapter= 参数 → 章节号；空串/非整数/负数回退“全部” */
+function parseChapterParam(p: string | null): number | 'all' {
+  if (p === null || p.trim() === '') return 'all';
+  const n = Number(p);
+  return Number.isInteger(n) && n >= 0 ? n : 'all';
 }

@@ -77,12 +77,14 @@ function createCompilerAdapters(execProbe = makeSpawnProbe()) {
     kind: 'cl',
     // cl 不支持 --version：无参数运行打印 banner（在 stderr）到用法信息，退出码非 0 属预期
     versionArgs: () => [],
-    versionSignature: () => /Microsoft \(R\)|Optimizing Compiler|Version \d+\.\d+/i,
+    // 同一行同时出现 Microsoft (R) 与 Optimizing Compiler：任意打印 "Version x.y" 的第三方工具冒充不了
+    versionSignature: () => /Microsoft \(R\)[^\n]*Optimizing Compiler|Optimizing Compiler[^\n]*Microsoft \(R\)/i,
     parseVersion: (_stdout, stderr) => {
       const m = /Version (\d+(?:\.\d+)*)/.exec(stderr) || /Version (\d+(?:\.\d+)*)/.exec(_stdout);
       return m === null ? 'Microsoft C/C++ Compiler' : `MSVC ${m[1]}`;
     },
-    buildCompileArgs: (binaryPath, sourcePath) => ['/nologo', '/W4', '/EHsc', '/std:c11', `/Fe:${binaryPath}`, sourcePath],
+    // /utf-8：cl 默认按系统 ACP（中文 Windows=GBK）解释源码与窄字符串，会导致中文输出假 WA/乱码
+    buildCompileArgs: (binaryPath, sourcePath) => ['/nologo', '/utf-8', '/W4', '/EHsc', '/std:c11', `/Fe:${binaryPath}`, sourcePath],
     probe: async (cmd) => probeWith(execProbe, cmd, cl),
     supports: () => ({ c99: true, signalExit: false, devEnvRequired: true }),
     getEnvironmentInfo: () => ({ hasInclude: !!process.env.INCLUDE, hasLib: !!process.env.LIB }),
@@ -106,19 +108,28 @@ function createCompilerAdapters(execProbe = makeSpawnProbe()) {
     return { found: true, version: adapter.parseVersion(r.stdout, r.stderr) ?? '', reason: '' };
   }
 
-  /** 最小编译探针：写临时 main.c → 用 adapter 参数编译 → 清理 */
+  /** 最小编译探针：写临时 main.c → 用 adapter 参数编译 → 运行验证 → 清理 */
   async function compileSanityCheck(cmd, adapter) {
     const os = require('node:os');
     const fsp = require('node:fs/promises');
-    const dir = path.join(os.tmpdir(), `cclab-probe-${process.pid}-${Date.now().toString(36)}`);
+    const crypto = require('node:crypto');
+    // 目录名带随机后缀：并发探测同毫秒不互踩
+    const dir = path.join(os.tmpdir(), `cclab-probe-${process.pid}-${crypto.randomUUID().slice(0, 8)}`);
     try {
       await fsp.mkdir(dir, { recursive: true });
       const src = path.join(dir, 'probe.c');
       const bin = path.join(dir, process.platform === 'win32' ? 'probe.exe' : 'probe');
       await fsp.writeFile(src, '#include <stdio.h>\nint main(void){return 0;}\n', 'utf8');
       const r = await execProbe(cmd, adapter.buildCompileArgs(bin, src), 15000);
-      if (r.ran && r.exitCode === 0) return { ok: true, reason: '' };
-      return { ok: false, reason: (r.stderr || '').split('\n')[0]?.slice(0, 120) || `exit=${String(r.exitCode)}` };
+      if (!r.ran || r.exitCode !== 0) {
+        return { ok: false, reason: (r.stderr || '').split('\n')[0]?.slice(0, 120) || `exit=${String(r.exitCode)}` };
+      }
+      // 编译产物必须真的能运行：防止"打印 gcc 字样且退出 0"的假 exe 通过
+      const run = await execProbe(bin, [], 5000);
+      if (!run.ran || run.exitCode !== 0) {
+        return { ok: false, reason: `产物无法运行（exit=${String(run.exitCode)}）` };
+      }
+      return { ok: true, reason: '' };
     } catch (err) {
       return { ok: false, reason: String(err).slice(0, 120) };
     } finally {

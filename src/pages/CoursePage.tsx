@@ -155,7 +155,7 @@ export function ChapterPage(): React.ReactElement {
 
       <aside className="chapter-code">
         {program !== undefined ? (
-          <CodePanel title={program.title} lines={program.lines.map((l) => ({ text: l, note: program.notes?.[program.lines.indexOf(l) + 1] }))} />
+          <CodePanel title={program.title} lines={program.lines.map((l, i) => ({ text: l, note: program.notes?.[i + 1] }))} />
         ) : (
           <div className="panel chapter-code-empty">
             <p>本小节没有关联的 C 代码。</p>

@@ -120,9 +120,10 @@ describe('runner-core payload 验证（渲染层不可信）', () => {
 });
 
 describe('runner-core 编译参数（单一实现，消除双实现漂移）', () => {
-  it('MSVC：/nologo /W4 /EHsc /std:c11 /Fe:（c11：教学 C 代码用 C99 for 内声明，默认模式不支持）', () => {
+  it('MSVC：/nologo /utf-8 /W4 /EHsc /std:c11 /Fe:（c11：教学 C 代码用 C99 for 内声明；/utf-8：中文 Windows 下源码/输出按 UTF-8）', () => {
     expect(runnerCore.buildCompileArgs('cl', 'C:\\t\\program.exe', 'C:\\t\\main.c')).toEqual([
       '/nologo',
+      '/utf-8',
       '/W4',
       '/EHsc',
       '/std:c11',

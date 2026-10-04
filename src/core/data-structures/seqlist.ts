@@ -114,7 +114,7 @@ export const SEQ_LIST_C_CODE: string[] = [
 ];
 
 /** 关键行号表（按代码文本定位，杜绝硬编码漂移） */
-const L = buildLineMap(SEQ_LIST_C_CODE, {
+export const L = buildLineMap(SEQ_LIST_C_CODE, {
   initFn: 'int seqListInit(',
   initMalloc: 'L->data = (int *)malloc(initCapacity',
   initSize: 'L->size = 0;',
@@ -134,14 +134,14 @@ const L = buildLineMap(SEQ_LIST_C_CODE, {
   deleteSize: 'L->size = L->size - 1;',
   findFn: 'int seqListFind(',
   findCmp: 'if (L->data[i] == value)',
-  findMiss: 'return -1;',
+  findMiss: ['return -1;', 'int seqListFind('],
   setFn: 'int seqListSet(',
-  setRange: 'if (pos < 0 || pos >= L->size)',
-  setWrite: 'L->data[pos] = value;',
+  setRange: ['if (pos < 0 || pos >= L->size)', 'int seqListSet('],
+  setWrite: ['L->data[pos] = value;', 'int seqListSet('],
   traverseFn: 'void seqListTraverse(',
   traversePrint: 'printf("%d ", L->data[i]);',
   destroyFn: 'void seqListDestroy(',
-  destroyFree: 'free(L->data);',
+  destroyFree: ['free(L->data);', 'void seqListDestroy('],
   destroyNull: 'L->data = NULL;',
 });
 
@@ -254,7 +254,8 @@ export function seqListInit(initCapacity = 4): VizOutcome<ArrayState> {
 function grow(rec: StepRecorder<ArrayState>, mem: SimMem): void {
   const state = rec.state;
   const oldCap = state.capacity;
-  const newCap = oldCap * 2;
+  // capacity=0（destroy 后 / init(0)）时 ×2 仍为 0，兜底为 1，保证后续 cells[pos] 可写
+  const newCap = Math.max(oldCap * 2, 1);
   const oldAddr = mem.addrOf('arr');
 
   const newArrAddr = mem.allocObject('arrNew', `int[${newCap}]`, `容量 ${newCap} 的新数组`, 'int[]');
@@ -394,7 +395,7 @@ export function seqListDelete(state: ArrayState, pos: number): VizOutcome<ArrayS
   const mem = rebuildMem(state);
 
   if (pos < 0 || pos >= state.size) {
-    rec.fail('下标越界', `删除位置 pos = ${pos} 不合法：必须满足 0 <= pos < size（当前 size = ${state.size}）。`, 60);
+    rec.fail('下标越界', `删除位置 pos = ${pos} 不合法：必须满足 0 <= pos < size（当前 size = ${state.size}）。`, L.deleteRange);
     return rec.finish();
   }
 
@@ -493,7 +494,7 @@ export function seqListSet(state: ArrayState, pos: number, value: number): VizOu
   const mem = rebuildMem(state);
 
   if (pos < 0 || pos >= state.size) {
-    rec.fail('下标越界', `修改位置 pos = ${pos} 不合法：必须满足 0 <= pos < size（当前 size = ${state.size}）。`, 83);
+    rec.fail('下标越界', `修改位置 pos = ${pos} 不合法：必须满足 0 <= pos < size（当前 size = ${state.size}）。`, L.setRange);
     return rec.finish();
   }
 

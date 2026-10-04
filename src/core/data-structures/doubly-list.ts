@@ -121,21 +121,22 @@ export const DOUBLY_LIST_C_CODE: string[] = [
 ];
 
 
-const L = buildLineMap(DOUBLY_LIST_C_CODE, {
+export const L = buildLineMap(DOUBLY_LIST_C_CODE, {
   initMalloc: 'head = (DNode *)malloc(sizeof(DNode));',
   pushFrontMalloc: 'DNode *newNode = (DNode *)malloc(sizeof(DNode));',
   pushFrontP1: 'newNode->prev = head;',
   pushFrontP2: 'newNode->next = head->next;',
   pushFrontP3: 'head->next->prev = newNode;',
   pushFrontP4: 'head->next = newNode;',
-  pushBackMalloc: 'DNode *newNode = (DNode *)malloc(sizeof(DNode));',
+  pushBackMalloc: ['DNode *newNode = (DNode *)malloc(sizeof(DNode));', 'int listPushBack('],
   pushBackTail: 'DNode *tail = head;',
   pushBackMove: 'tail = tail->next;',
+  pushBackNewNull: 'newNode->next = NULL;',
   pushBackP1: 'newNode->prev = tail;',
   pushBackP2: 'tail->next = newNode;',
   delTarget: 'DNode *target = head->next;',
   delWhile: 'while (target != NULL && target->data != value)',
-  delMiss: 'return -1;',
+  delMiss: ['return -1;', 'int listDeleteValue('],
   delBypass1: 'target->prev->next = target->next;',
   delBypass2: 'target->next->prev = target->prev;',
   delFree: 'free(target);',
@@ -143,8 +144,8 @@ const L = buildLineMap(DOUBLY_LIST_C_CODE, {
   fwdPrint: 'printf("%d <-> ", current->data);',
   bwdFn: 'void traverseBackward(void)',
   bwdCurrent: 'DNode *current = head;',
-  bwdSeek: 'current = current->next;',
-  bwdPrint: 'printf("%d <-> ", current->data);',
+  bwdSeek: ['current = current->next;', 'void traverseBackward(void)'],
+  bwdPrint: ['printf("%d <-> ", current->data);', 'void traverseBackward(void)'],
   bwdMove: 'current = current->prev;',
   destroyFn: 'void listDestroy(void)',
   destroyFree: 'free(current);',
@@ -382,8 +383,8 @@ export function doublyPushBack(state: ListState, value: number): VizOutcome<List
   }
 
   const id = allocDNode(rec, mem, value, L.pushBackMalloc);
-  // 尾插只有两步：prev 指向 tail，tail->next = newNode（next 为 NULL 无需第③步）
-  linkDoublyAfter(rec, mem, cur, id, { p1: L.pushBackP1, p2: L.pushBackP2, p3: L.pushBackP1, p4: L.pushBackP2 }, 'tail');
+  // 尾插三步：newNode->next = NULL（p2 步）、newNode->prev = tail（p1）、tail->next = newNode（p4；无 oldNext 故无 p3）
+  linkDoublyAfter(rec, mem, cur, id, { p1: L.pushBackP1, p2: L.pushBackNewNull, p3: L.pushBackP1, p4: L.pushBackP2 }, 'tail');
   return rec.finish();
 }
 
@@ -407,7 +408,7 @@ export function doublyDeleteValue(state: ListState, value: number): VizOutcome<L
   let cur = nextOf(state, 'n0');
   for (;;) {
     if (cur === null) {
-      rec.fail('没找到', `链表中不存在值为 ${value} 的节点。`, 61);
+      rec.fail('没找到', `链表中不存在值为 ${value} 的节点。`, L.delMiss);
       return rec.finish();
     }
     const v = nodeValue(rec.state, cur);

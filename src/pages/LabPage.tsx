@@ -178,7 +178,8 @@ function chapterToLabId(chapter: string | null): string {
     case '6':
       return 'queue';
     case '7':
-      return 'array';
+      // 第 7 章（字符串与数组）无专属实验室，落到最贴近的顺序表（数组）实验室
+      return 'seqlist';
     case '8':
       return 'tree';
     case '9':

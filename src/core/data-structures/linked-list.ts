@@ -153,14 +153,14 @@ export const LINKED_LIST_C_CODE: string[] = [
   '}',
 ];
 
-/** 关键行号表（按代码文本定位） */
-const L = buildLineMap(LINKED_LIST_C_CODE, {
+/** 关键行号表（按代码文本定位；重复文本用 [needle, 锚] 形式锚定到各自函数） */
+export const L = buildLineMap(LINKED_LIST_C_CODE, {
   initMalloc: 'head = (Node *)malloc(sizeof(Node));',
   pushFrontFn: 'int listPushFront(',
   pushFrontMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
   pushFrontNewNext: 'newNode->next = head->next;',
   pushFrontHeadNext: 'head->next = newNode;',
-  pushBackMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
+  pushBackMalloc: ['Node *newNode = (Node *)malloc(sizeof(Node));', 'int listPushBack('],
   pushBackCurrent: 'Node *current = head;',
   pushBackWhile: 'while (current->next != NULL)',
   pushBackMove: 'current = current->next;',
@@ -170,43 +170,43 @@ const L = buildLineMap(LINKED_LIST_C_CODE, {
   insertRange: 'if (pos < 0)',
   insertPrev: 'Node *prev = head;',
   insertMove: 'prev = prev->next;',
-  insertMalloc: 'Node *newNode = (Node *)malloc(sizeof(Node));',
+  insertMalloc: ['Node *newNode = (Node *)malloc(sizeof(Node));', 'int listInsertAt('],
   insertNewNext: 'newNode->next = prev->next;',
   insertPrevNext: 'prev->next = newNode;',
   delValFn: 'int listDeleteValue(',
-  delValPrev: 'Node *prev = head;',
+  delValPrev: ['Node *prev = head;', 'int listDeleteValue('],
   delValWhile: 'while (prev->next != NULL && prev->next->data != value)',
-  delValMove: 'prev = prev->next;',
+  delValMove: ['prev = prev->next;', 'int listDeleteValue('],
   delValMiss: 'return -1;                /* 走到头也没找到 */',
   delValTarget: 'Node *target = prev->next;',
   delValBypass: 'prev->next = target->next;',
   delValFree: 'free(target);',
   delAtFn: 'int listDeleteAt(',
-  delAtRange: 'if (pos < 0)',
-  delAtPrev: 'Node *prev = head;',
-  delAtMove: 'prev = prev->next;',
+  delAtRange: ['if (pos < 0)', 'int listDeleteAt('],
+  delAtPrev: ['Node *prev = head;', 'int listDeleteAt('],
+  delAtMove: ['prev = prev->next;', 'int listDeleteAt('],
   delAtMiss: 'return -1;                /* pos 越界 */',
-  delAtTarget: 'Node *target = prev->next;',
-  delAtBypass: 'prev->next = target->next;',
-  delAtFree: 'free(target);',
+  delAtTarget: ['Node *target = prev->next;', 'int listDeleteAt('],
+  delAtBypass: ['prev->next = target->next;', 'int listDeleteAt('],
+  delAtFree: ['free(target);', 'int listDeleteAt('],
   findFn: 'Node *listFind(',
   findCurrent: 'Node *current = head->next;',
   findWhile: 'while (current != NULL)',
   findCmp: 'if (current->data == value)',
-  findMove: 'current = current->next;',
+  findMove: ['current = current->next;', 'Node *listFind('],
   findMiss: 'return NULL;',
   traverseFn: 'void listTraverse(',
-  traverseCurrent: 'Node *current = head->next;',
-  traverseWhile: 'while (current != NULL)',
+  traverseCurrent: ['Node *current = head->next;', 'void listTraverse('],
+  traverseWhile: ['while (current != NULL)', 'void listTraverse('],
   traversePrint: 'printf("%d -> ", current->data);',
-  traverseMove: 'current = current->next;',
+  traverseMove: ['current = current->next;', 'void listTraverse('],
   traverseNull: 'printf("NULL',
   setFn: 'int listSet(',
   setFind: 'Node *p = listFind(from);',
-  setMiss: 'return -1;',
+  setMiss: ['return -1;', 'int listSet('],
   setWrite: 'p->data = to;',
   destroyFn: 'void listDestroy(',
-  destroyCurrent: 'Node *current = head;',
+  destroyCurrent: ['Node *current = head;', 'void listDestroy('],
   destroySave: 'Node *next = current->next;',
   destroyFree: 'free(current);',
   destroyNull: 'head = NULL;',
@@ -462,10 +462,6 @@ export function listPushBack(state: ListState, value: number): VizOutcome<ListSt
       variables: [ptrVar('current', mem.addrOf(curId), curId)],
       memory: mem.snapshot(),
       highlight: [curId, stepTo],
-      mutate: (s) => {
-        const p = s.pointers.find((x) => x.name === 'current');
-        if (p !== undefined) p.target = stepTo;
-      },
     });
     rec.record({
       type: 'move',
@@ -495,7 +491,7 @@ export function listInsertAt(state: ListState, pos: number, value: number): VizO
   const mem = rebuildListMem(state);
 
   if (pos < 0) {
-    rec.fail('参数错误', `pos = ${pos} 不合法，必须 pos >= 0。`, 50);
+    rec.fail('参数错误', `pos = ${pos} 不合法，必须 pos >= 0。`, L.insertRange);
     return rec.finish();
   }
 
@@ -648,9 +644,9 @@ export function listDeleteValue(state: ListState, value: number): VizOutcome<Lis
   const rec = new StepRecorder<ListState>(state);
   const mem = rebuildListMem(state);
 
-  const { prevId, targetId } = locatePrev(rec, mem, value, 69);
+  const { prevId, targetId } = locatePrev(rec, mem, value, L.delValPrev);
   if (targetId === null) {
-    rec.fail('没找到', `链表中不存在值为 ${value} 的节点，删除失败。`, 74);
+    rec.fail('没找到', `链表中不存在值为 ${value} 的节点，删除失败。`, L.delValMiss);
     return rec.finish();
   }
   rec.record({
@@ -665,7 +661,7 @@ export function listDeleteValue(state: ListState, value: number): VizOutcome<Lis
       s.pointers.push({ name: 'target', target: targetId });
     },
   });
-  unlinkAndFree(rec, mem, prevId, targetId, 80, 81);
+  unlinkAndFree(rec, mem, prevId, targetId, L.delValBypass, L.delValFree);
   return rec.finish();
 }
 
@@ -675,7 +671,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
   const mem = rebuildListMem(state);
 
   if (pos < 0) {
-    rec.fail('参数错误', `pos = ${pos} 不合法，必须 pos >= 0。`, 85);
+    rec.fail('参数错误', `pos = ${pos} 不合法，必须 pos >= 0。`, L.delAtRange);
     return rec.finish();
   }
 
@@ -715,7 +711,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
 
   const targetId = nextOf(rec.state, nodeById(rec.state, prevId));
   if (targetId === null) {
-    rec.fail('下标越界', `pos = ${pos} 超出范围（链表长度 = ${listValues(state).length}）。`, 96);
+    rec.fail('下标越界', `pos = ${pos} 超出范围（链表长度 = ${listValues(state).length}）。`, L.delAtMiss);
     return rec.finish();
   }
   rec.record({
@@ -730,7 +726,7 @@ export function listDeleteAt(state: ListState, pos: number): VizOutcome<ListStat
       s.pointers.push({ name: 'target', target: targetId });
     },
   });
-  unlinkAndFree(rec, mem, prevId, targetId, 100, 101);
+  unlinkAndFree(rec, mem, prevId, targetId, L.delAtBypass, L.delAtFree);
   return rec.finish();
 }
 
@@ -811,7 +807,7 @@ export function listSet(state: ListState, from: number, to: number): VizOutcome<
     // 没找到：复用查找步骤后补一条失败步骤
     const rec = new StepRecorder<ListState>(state);
     for (const step of find.steps) rec.appendRaw(step);
-    rec.fail('没找到', `链表中不存在值为 ${from} 的节点，修改失败。`, 125);
+    rec.fail('没找到', `链表中不存在值为 ${from} 的节点，修改失败。`, L.setMiss);
     return rec.finish();
   }
 

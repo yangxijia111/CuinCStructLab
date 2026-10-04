@@ -15,7 +15,6 @@ import { judgeSubmission } from '../judge/judge';
 import type { JudgeOutput } from '../judge/judge';
 import { JUDGE_STATUS_LABELS } from '../judge/judge';
 import { useAppStore } from '../ui/AppStore';
-import { getDb } from '../storage/db';
 import { saveSubmission } from '../storage/repos';
 
 export function CodingPage(): React.ReactElement {
@@ -34,7 +33,13 @@ export function CodingPage(): React.ReactElement {
 
   // 使用设置页保存的自定义编译器路径（含失效自动回退 PATH 探测）
   useEffect(() => {
-    void detectCompilersWithFallback(compilerPath).then(setAvailability);
+    let cancelled = false;
+    void detectCompilersWithFallback(compilerPath).then((a) => {
+      if (!cancelled) setAvailability(a);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [compilerPath]);
 
   const problem = problemId === null ? null : (CODING_PROBLEMS.find((p) => p.id === problemId) ?? null);
@@ -81,17 +86,10 @@ export function CodingPage(): React.ReactElement {
   );
 }
 
-/** 提交记录持久化 */
+/** 提交记录持久化（失败进 storageError 横幅，绝不静默吞掉） */
 function useCodingPersistence(): { withDbRef: (fn: (db: import('../storage/db').AppDatabase) => void) => void } {
-  const { recordAttempt } = useAppStore();
-  return {
-    withDbRef: (fn) => {
-      void getDb()
-        .then(fn)
-        .catch(() => undefined);
-      void recordAttempt;
-    },
-  };
+  const { withDb } = useAppStore();
+  return { withDbRef: withDb };
 }
 
 function ProblemWorkbench({

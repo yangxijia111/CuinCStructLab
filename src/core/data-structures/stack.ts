@@ -121,7 +121,7 @@ export const STACK_C_CODE: string[] = [
   '}',
 ];
 
-const L = buildLineMap(STACK_C_CODE, {
+export const L = buildLineMap(STACK_C_CODE, {
   pushFn: 'int stackPush(',
   pushFull: 'return -1;        /* 栈满，放不进 */',
   pushWrite: 's->data[s->top] = value;',

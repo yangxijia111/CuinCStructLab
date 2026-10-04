@@ -105,10 +105,11 @@ describe('MSVC 适配器（D1/D3/D4 修复验证）', () => {
     expect(r.version).toBe('MSVC 19.38.33133');
   });
 
-  it('编译参数：/nologo /W4 /EHsc /std:c11 /Fe:（c11 支持教学 C99 语法）', () => {
+  it('编译参数：/nologo /utf-8 /W4 /EHsc /std:c11 /Fe:（c11 支持教学 C99 语法；/utf-8 防 GBK 乱码假 WA）', () => {
     const a = adaptersFor({});
     expect(a.cl.buildCompileArgs('C:/t/program.exe', 'C:/t/main.c')).toEqual([
       '/nologo',
+      '/utf-8',
       '/W4',
       '/EHsc',
       '/std:c11',

@@ -10,17 +10,12 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const runnerCore = require('./runner-core.cjs');
+const { isDevUrl } = require('./dev-url.cjs');
 const { registerAppProtocolScheme, attachAppProtocolHandler, APP_ORIGIN, APP_ENTRY } = require('./protocol.cjs');
 
 const DB_FILE = 'cuincstructlab.db';
 /** db:save 载荷上限（学习库远小于此，防滥用） */
 const MAX_DB_BYTES = 64 * 1024 * 1024;
-/** 开发服务器仅允许本机回环地址 */
-const DEV_URL_ALLOW = /^http:\/\/(localhost|127\.0\.0\.1):\d+/;
-
-function isDevUrl(url) {
-  return DEV_URL_ALLOW.test(url);
-}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -84,8 +79,8 @@ ipcMain.handle('db:save', async (_event, data) => {
   if (!(data instanceof Uint8Array)) throw new Error('db:save 需要二进制数据（Uint8Array）');
   if (data.byteLength > MAX_DB_BYTES) throw new Error(`db:save 数据超过上限（${MAX_DB_BYTES} 字节）`);
   const file = path.join(app.getPath('userData'), DB_FILE);
-  const tmp = `${file}.tmp`;
-  // 先写临时文件再原子替换，避免写一半损坏
+  // tmp 名带随机后缀：并发保存互不覆盖，rename 依然是原子替换
+  const tmp = `${file}.${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.tmp`;
   await fs.writeFile(tmp, Buffer.from(data));
   await fs.rename(tmp, file);
 });
@@ -94,7 +89,14 @@ ipcMain.handle('db:save', async (_event, data) => {
 ipcMain.handle('db:reset', async () => {
   const file = path.join(app.getPath('userData'), DB_FILE);
   await fs.rm(file, { force: true });
-  await fs.rm(`${file}.tmp`, { force: true }).catch(() => undefined);
+  // 清掉历史遗留的固定名 tmp 与可能的随机 tmp 残留
+  const dir = path.dirname(file);
+  const entries = await fs.readdir(dir).catch(() => []);
+  await Promise.all(
+    entries
+      .filter((n) => n.startsWith(`${DB_FILE}.`) && n.endsWith('.tmp'))
+      .map((n) => fs.rm(path.join(dir, n), { force: true }).catch(() => undefined)),
+  );
 });
 
 /* ============ Runner 桥（只做验证与转发，逻辑全部在 runner-core） ============ */
@@ -127,10 +129,11 @@ ipcMain.handle('app:chooseCompilerPath', async () => {
 
 registerAppProtocolScheme();
 
-// E2E/测试隔离：--user-data-dir=<dir> 覆盖 userData（必须在 app ready 之前）
+// E2E/测试隔离：--user-data-dir=<dir> 覆盖 userData（必须在 app ready 之前；空值会让 Electron 抛错）
 const userDataArg = process.argv.find((a) => a.startsWith('--user-data-dir='));
 if (userDataArg !== undefined) {
-  app.setPath('userData', userDataArg.slice('--user-data-dir='.length));
+  const dirArg = userDataArg.slice('--user-data-dir='.length);
+  if (dirArg.trim() !== '') app.setPath('userData', dirArg);
 }
 
 app.whenReady().then(() => {
@@ -139,6 +142,11 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// 应用退出前终止仍在跑的判题/编译子进程，避免孤儿进程继续占用 CPU
+app.on('will-quit', () => {
+  runnerCore.killAllActive();
 });
 
 app.on('window-all-closed', () => {

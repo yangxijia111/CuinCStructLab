@@ -94,7 +94,7 @@ export const HEAP_C_CODE: string[] = [
   '}',
 ];
 
-const L = buildLineMap(HEAP_C_CODE, {
+export const L = buildLineMap(HEAP_C_CODE, {
   insertWrite: 'h->data[i] = value;',
   insertStop: '不再比父节点大',
   insertSwap: 'swap(&h->data[i], &h->data[p]);',

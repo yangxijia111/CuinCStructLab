@@ -118,7 +118,11 @@ function killTree(proc) {
   if (proc.pid === undefined) return;
   if (process.platform === 'win32') {
     try {
-      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore', shell: false });
+      const tk = spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore', shell: false });
+      // spawn 的 ENOENT 是异步 error 事件，不挂监听会变成 uncaughtException 击穿主进程
+      tk.on('error', () => {
+        try { proc.kill(); } catch { /* 已退出 */ }
+      });
     } catch {
       try { proc.kill(); } catch { /* 已退出 */ }
     }
@@ -129,6 +133,32 @@ function killTree(proc) {
       try { proc.kill('SIGKILL'); } catch { /* 已退出 */ }
     }
   }
+}
+
+/** 活跃子进程登记：应用退出时统一终止，避免判题进行中退出留下孤儿进程 */
+const activeProcs = new Set();
+
+/** 杀掉全部在跑的编译/判题子进程（app will-quit 时调用） */
+function killAllActive() {
+  for (const p of activeProcs) {
+    try { killTree(p); } catch { /* 已退出 */ }
+  }
+  activeProcs.clear();
+}
+
+/** 截断点落在多字节 UTF-8 序列中间时，回退到序列边界，避免末尾产生替换字符 */
+function trimUtf8Boundary(buf) {
+  let drop = 0;
+  while (drop < 3 && drop < buf.length) {
+    const b = buf[buf.length - 1 - drop];
+    if (b === undefined) return buf;
+    if ((b & 0xc0) !== 0x80) {
+      const need = b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : b >= 0xc0 ? 2 : 1;
+      return drop + 1 < need ? buf.subarray(0, buf.length - 1 - drop) : buf;
+    }
+    drop++;
+  }
+  return buf;
 }
 
 /** 字节级限幅累加器：超出 max 后丢弃，记录 truncated */
@@ -153,8 +183,19 @@ function makeOutputCap(max) {
       }
     },
     text() {
-      const body = Buffer.concat(chunks).toString('utf8');
-      return truncated ? body + OUTPUT_TRUNCATION_NOTICE : body;
+      let body;
+      if (truncated) {
+        // 限幅截断可能切在多字节字符中间：先修边界再拼接
+        const last = chunks.pop();
+        const fixed = last === undefined ? Buffer.alloc(0) : trimUtf8Boundary(last);
+        if (fixed.length > 0) chunks.push(fixed);
+        body = Buffer.concat(chunks).toString('utf8');
+        chunks.push(last); // 保持内部状态不被 text() 破坏
+        body += OUTPUT_TRUNCATION_NOTICE;
+      } else {
+        body = Buffer.concat(chunks).toString('utf8');
+      }
+      return body;
     },
     get truncated() {
       return truncated;
@@ -193,15 +234,37 @@ function execSafe(cmd, args, opts) {
     const outCap = makeOutputCap(MAX_OUTPUT);
     const errCap = makeOutputCap(MAX_OUTPUT);
     let killed = false;
+    let settled = false;
+    let forceTimer = null;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (forceTimer !== null) clearTimeout(forceTimer);
+      activeProcs.delete(proc);
+      resolve(result);
+    };
+    activeProcs.add(proc);
     const timer = setTimeout(() => {
       killed = true;
       killTree(proc);
+      // 杀树后宽限 2s：若 close 仍未触发（taskkill 缺失/不可杀状态），强制结算，避免 IPC 永久挂起
+      forceTimer = setTimeout(() => {
+        settle({
+          exitCode: null,
+          signal: null,
+          timedOut: true,
+          spawnError: null,
+          durationMs: performance.now() - started,
+          stdout: outCap.text(),
+          stderr: errCap.text(),
+        });
+      }, 2000);
     }, opts.timeoutMs);
     proc.stdout.on('data', (d) => outCap.push(d));
     proc.stderr.on('data', (d) => errCap.push(d));
     proc.on('error', (err) => {
-      clearTimeout(timer);
-      resolve({
+      settle({
         exitCode: null,
         signal: null,
         timedOut: killed,
@@ -212,8 +275,7 @@ function execSafe(cmd, args, opts) {
       });
     });
     proc.on('close', (code, signal) => {
-      clearTimeout(timer);
-      resolve({
+      settle({
         exitCode: code === null || code === undefined ? null : code,
         signal: signal === undefined ? null : signal,
         timedOut: killed,
@@ -325,4 +387,5 @@ module.exports = {
   execSafe,
   classifyOutcome,
   compileAndRun,
+  killAllActive,
 };

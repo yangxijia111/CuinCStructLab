@@ -50,7 +50,7 @@ export function streakDays(days: Iterable<string>, today = todayKey()): number {
   const set = new Set(days);
   if (set.size === 0) return 0;
   // 从今天或昨天开始数（今天还没学不算断）
-  const start = set.has(today) ? new Date(today) : new Date(dateAdd(today, -1));
+  const start = set.has(today) ? parseLocalDate(today) : parseLocalDate(dateAdd(today, -1));
   if (!set.has(today) && !set.has(dateAdd(today, -1))) return 0;
   let streak = 0;
   let cur = start;
@@ -58,13 +58,19 @@ export function streakDays(days: Iterable<string>, today = todayKey()): number {
     const key = todayKey(cur);
     if (!set.has(key)) break;
     streak += 1;
-    cur = new Date(dateAdd(key, -1));
+    cur = parseLocalDate(dateAdd(key, -1));
   }
   return streak;
 }
 
 function dateAdd(dateStr: string, delta: number): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   d.setDate(d.getDate() + delta);
   return todayKey(d);
+}
+
+/** 'YYYY-MM-DD' → 本地时区 Date（直接 new Date(str) 会按 UTC 午夜解析，UTC 以西地区会错一天） */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y!, (m ?? 1) - 1, d ?? 1);
 }

@@ -156,7 +156,7 @@ export function binarySearchSteps(arr: number[], target: number, assumeSorted = 
         type: 'assign',
         title: `a[${mid}]=${arr[mid]} < ${target}：目标只可能在右半，low = mid+1 = ${mid + 1}`,
         description: `左半 [${low}, ${mid}] 整体被排除（它们都 ≤ ${arr[mid]} < ${target}）。`,
-        codeLine: 20,
+        codeLine: 19,
         variables: [indexVar('low', mid + 1), indexVar('high', high)],
         metrics: { comparisons: round, swaps: 0 },
         mutate: (s) => {
@@ -172,7 +172,7 @@ export function binarySearchSteps(arr: number[], target: number, assumeSorted = 
         type: 'assign',
         title: `a[${mid}]=${arr[mid]} > ${target}：目标只可能在左半，high = mid-1 = ${mid - 1}`,
         description: `右半 [${mid}, ${high}] 整体被排除。`,
-        codeLine: 22,
+        codeLine: 21,
         variables: [indexVar('low', low), indexVar('high', mid - 1)],
         metrics: { comparisons: round, swaps: 0 },
         mutate: (s) => {
@@ -190,7 +190,7 @@ export function binarySearchSteps(arr: number[], target: number, assumeSorted = 
     type: 'info',
     title: `low(${low}) > high(${high})：区间为空，${target} 不存在，返回 -1`,
     description: `共比较 ${round} 次。`,
-    codeLine: 25,
+    codeLine: 24,
     variables: [indexVar('low', low), indexVar('high', high)],
     mutate: (s) => {
       for (const c of s.cells) c.flags = [];

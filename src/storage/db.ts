@@ -25,6 +25,11 @@ export class AppDatabase {
   private revision = 0;
   /** flush 串行链：并发 flush 调用排队执行，杜绝交错保存 */
   private flushChain: Promise<void> = Promise.resolve();
+  /**
+   * 持久化失败通知（AppStore 订阅后进入 storageError 横幅）。
+   * 写操作内部的防抖保存失败无法经调用方返回，必须经此回调上抛，绝不静默吞掉。
+   */
+  persistErrorHandler: ((err: unknown) => void) | null = null;
 
   private constructor(db: Database, backend: PersistenceBackend) {
     this.db = db;
@@ -79,14 +84,14 @@ export class AppDatabase {
       this.db.run('ROLLBACK');
       throw new Error(`数据库迁移失败（v${current}→v${target}）：${err instanceof Error ? err.message : String(err)}`, { cause: err });
     }
-    void this.schedulePersist();
+    this.schedulePersist().catch(() => undefined); // 失败已由 persistErrorHandler 上报
   }
 
   /** 执行写语句 */
   run(sql: string, params: SqlParam[] = []): void {
     this.db.run(sql, params);
     this.markDirty();
-    void this.schedulePersist();
+    this.schedulePersist().catch(() => undefined); // 失败已由 persistErrorHandler 上报
   }
 
   /** 查询（返回对象数组） */
@@ -115,7 +120,7 @@ export class AppDatabase {
       throw err;
     }
     this.markDirty();
-    void this.schedulePersist();
+    this.schedulePersist().catch(() => undefined); // 失败已由 persistErrorHandler 上报
   }
 
   /** 导出数据库字节（备份/持久化） */
@@ -129,14 +134,21 @@ export class AppDatabase {
     this.dirty = true;
   }
 
-  /** 防抖持久化（500ms） */
+  /** 防抖持久化（500ms）；失败经 persistErrorHandler 上报，调用方无需重复捕获 */
   async schedulePersist(): Promise<void> {
     this.dirty = true;
     if (this.persistTimer !== null) clearTimeout(this.persistTimer);
     return new Promise((resolve, reject) => {
       this.persistTimer = setTimeout(() => {
         this.persistTimer = null;
-        this.flush().then(resolve, reject);
+        this.flush().then(resolve, (err: unknown) => {
+          try {
+            this.persistErrorHandler?.(err);
+          } catch {
+            /* 通知自身失败不影响主流程 */
+          }
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
       }, 500);
     });
   }
@@ -208,10 +220,17 @@ let singleton: AppDatabase | null = null;
 let opening: Promise<AppDatabase | null> | null = null;
 /** open 代次：reset 期间挂起的 open 完成后不得再覆盖 singleton（防“复活”） */
 let openToken = 0;
+/** 进行中的 reset（reset 期间 getDb() 等它完成，杜绝与 reset 并发另开第二个实例） */
+let resetting: Promise<AppDatabase> | null = null;
 
 export async function getDb(): Promise<AppDatabase> {
   for (;;) {
     if (singleton !== null) return singleton;
+    // reset 进行中：等待其完成（成功后 singleton 必有值；失败则把错误上抛给调用方）
+    if (resetting !== null) {
+      await resetting;
+      continue;
+    }
     const token = openToken;
     if (opening === null) {
       opening = AppDatabase.open()
@@ -237,18 +256,29 @@ export async function getDb(): Promise<AppDatabase> {
  * 清空全部数据并重建数据库（设置页「清空全部数据」统一入口）。
  * 流程：关闭当前 sql.js 实例与底层连接 → backend.reset() 删除底层数据
  * （Web：IndexedDB 库；Electron：userData/cuincstructlab.db）→ 重新 open + migrate。
+ * reset 全程持有 resetting 令牌：窗口内任何 getDb() 都等待而非另开实例，
+ * 消除「reset 与 getDb 双开实例交替整库覆盖」的竞态。
  */
 export async function resetDatabase(deps?: Partial<AppDatabaseDeps>): Promise<AppDatabase> {
+  if (resetting !== null) return resetting; // 并发 reset 复用同一次
   openToken += 1;
   opening = null;
   if (singleton !== null) {
     singleton.close();
     singleton = null;
   }
-  const backend = deps?.backend ?? (await import('./backend')).defaultBackend();
-  await backend.reset();
-  singleton = await AppDatabase.open({ ...deps, backend });
-  return singleton;
+  resetting = (async () => {
+    try {
+      const backend = deps?.backend ?? (await import('./backend')).defaultBackend();
+      await backend.reset();
+      const db = await AppDatabase.open({ ...deps, backend });
+      singleton = db;
+      return db;
+    } finally {
+      resetting = null;
+    }
+  })();
+  return resetting;
 }
 
 /** 测试辅助：重置单例（先落盘未保存的修改再关闭，等价「正常退出前 flush」） */

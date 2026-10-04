@@ -91,20 +91,21 @@ export const TREE_C_CODE: string[] = [
   '}',
 ];
 
-const L = buildLineMap(TREE_C_CODE, {
+export const L = buildLineMap(TREE_C_CODE, {
   newNodeMalloc: 'TreeNode *node = (TreeNode *)malloc(sizeof(TreeNode));',
   preFn: 'void preorder(TreeNode *node) {',
-  preNull: 'if (node == NULL) {',
+  // 判空行在每个遍历函数里都出现，必须锚定到各自函数体内（否则会命中 newNode 的同名行）
+  preNull: ['if (node == NULL) {', 'void preorder(TreeNode *node) {'],
   prePrint: '① 先访问根',
   preLeft: '② 再递归左子树',
   preRight: '③ 最后递归右子树',
   inFn: 'void inorder(TreeNode *node) {',
-  inNull: 'if (node == NULL) {',
+  inNull: ['if (node == NULL) {', 'void inorder(TreeNode *node) {'],
   inLeft: '① 先走左',
   inPrint: '② 输出根',
   inRight: '③ 再走右',
   postFn: 'void postorder(TreeNode *node) {',
-  postNull: 'if (node == NULL) {',
+  postNull: ['if (node == NULL) {', 'void postorder(TreeNode *node) {'],
   postLeft: 'postorder(node->left);',
   postRight: 'postorder(node->right);',
   postPrint: '③ 根',
@@ -112,7 +113,7 @@ const L = buildLineMap(TREE_C_CODE, {
   levelRoot: 'queue[rear++] = root;',
   levelWhile: 'while (front < rear) {',
   levelOut: 'TreeNode *node = queue[front++];',
-  levelPrint: 'printf("%d ", node->data);',
+  levelPrint: ['printf("%d ", node->data);', 'void levelOrder(TreeNode *root) {'],
   levelLeft: 'queue[rear++] = node->left;',
   levelRight: 'queue[rear++] = node->right;',
   destroyFn: 'void destroyTree(TreeNode *node) {',

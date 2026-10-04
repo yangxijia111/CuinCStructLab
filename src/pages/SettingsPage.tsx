@@ -34,9 +34,15 @@ export function SettingsPage(): React.ReactElement {
     setPathDraft(compilerPath);
   }
 
-  // 自定义路径变化时自动探测
+  // 自定义路径变化时自动探测（旧探测未完成时新结果不得被旧结果覆盖）
   useEffect(() => {
-    void detectCompilersWithFallback(compilerPath).then(setAvailability);
+    let cancelled = false;
+    void detectCompilersWithFallback(compilerPath).then((a) => {
+      if (!cancelled) setAvailability(a);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [compilerPath]);
 
   const doBrowse = async (): Promise<void> => {
