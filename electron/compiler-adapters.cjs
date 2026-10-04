@@ -95,7 +95,35 @@ function createCompilerAdapters(execProbe = makeSpawnProbe()) {
     if (!adapter.versionSignature().test(out)) {
       return { found: false, version: null, reason: '版本输出签名不匹配（不是该编译器）' };
     }
+    // Windows 上 gcc/clang 可能"存在但编译不了"（典型：LLVM clang 无 MSVC 头，
+    // 版本探测通过而任何 #include 都失败）——签名通过后追加最小编译探针。
+    if (process.platform === 'win32' && adapter.kind !== 'cl') {
+      const compiled = await compileSanityCheck(cmd, adapter);
+      if (!compiled.ok) {
+        return { found: false, version: null, reason: `编译器存在但无法编译（${compiled.reason}）` };
+      }
+    }
     return { found: true, version: adapter.parseVersion(r.stdout, r.stderr) ?? '', reason: '' };
+  }
+
+  /** 最小编译探针：写临时 main.c → 用 adapter 参数编译 → 清理 */
+  async function compileSanityCheck(cmd, adapter) {
+    const os = require('node:os');
+    const fsp = require('node:fs/promises');
+    const dir = path.join(os.tmpdir(), `cclab-probe-${process.pid}-${Date.now().toString(36)}`);
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+      const src = path.join(dir, 'probe.c');
+      const bin = path.join(dir, process.platform === 'win32' ? 'probe.exe' : 'probe');
+      await fsp.writeFile(src, '#include <stdio.h>\nint main(void){return 0;}\n', 'utf8');
+      const r = await execProbe(cmd, adapter.buildCompileArgs(bin, src), 15000);
+      if (r.ran && r.exitCode === 0) return { ok: true, reason: '' };
+      return { ok: false, reason: (r.stderr || '').split('\n')[0]?.slice(0, 120) || `exit=${String(r.exitCode)}` };
+    } catch (err) {
+      return { ok: false, reason: String(err).slice(0, 120) };
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
 
   return { gcc, clang, cl, probeWith };

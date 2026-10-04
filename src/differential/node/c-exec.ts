@@ -14,6 +14,10 @@ const runnerCorePath = path.join(process.cwd(), 'electron', 'runner-core.cjs');
 const runnerCore = require(runnerCorePath) as {
   execSafe: (cmd: string, args: string[], opts: { cwd?: string; timeoutMs: number; stdin?: string }) => Promise<{ exitCode: number | null; stdout: string; stderr: string; timedOut: boolean; durationMs: number }>;
   buildCompileArgs: (kind: 'gcc' | 'clang' | 'cl', binaryPath: string, sourcePath: string) => string[];
+  detectCompiler: (customPath?: string) => Promise<{
+    available: boolean;
+    compiler: { kind: 'gcc' | 'clang' | 'cl'; path: string; version: string } | null;
+  }>;
 };
 
 export interface CCompilerSpec {
@@ -68,21 +72,23 @@ export async function runCProgram(source: string, compiler: CCompilerSpec, opts:
   }
 }
 
-/** 探测指定 kind 的编译器（差分按需选择 gcc/clang；cl 由 MSVC 环境提供） */
+/** 探测指定 kind 的编译器：走 runner-core 的 adapter 探测（含版本签名 + Windows 编译探针） */
 export async function detectCompilerByKind(kind: 'gcc' | 'clang' | 'cl'): Promise<CCompilerSpec | null> {
+  // 直接可用且 kind 匹配
+  const primary = await runnerCore.detectCompiler();
+  if (primary.available && primary.compiler !== null && primary.compiler.kind === kind) {
+    return { kind, path: primary.compiler.path };
+  }
+  // 主探测给了别的 kind：对候选命令逐一走 adapter 完整探测（签名 + Windows 编译探针）
   const candidates: Record<'gcc' | 'clang' | 'cl', string[]> = {
     gcc: ['gcc', 'cc'],
     clang: ['clang'],
     cl: ['cl'],
   };
   for (const cmd of candidates[kind]) {
-    const probe = await runnerCore.execSafe(cmd, kind === 'cl' ? [] : ['--version'], { timeoutMs: 8000 });
-    if (probe.exitCode === null) continue; // spawn 失败（ENOENT 等）：绝不从错误信息里"认出"编译器
-    // gcc/clang 版本在 stdout；MSVC banner 在 stderr。签名匹配防任意 exe 冒充（正式探测走 compiler-adapters）
-    const out = kind === 'cl' ? `${probe.stdout}\n${probe.stderr}` : probe.stdout;
-    const signature = kind === 'cl' ? /Microsoft/i : kind === 'clang' ? /clang/i : /gcc|Free Software/i;
-    if (signature.test(out)) {
-      return { kind, path: cmd };
+    const r = await runnerCore.detectCompiler(cmd);
+    if (r.available && r.compiler !== null && r.compiler.kind === kind) {
+      return { kind, path: r.compiler.path };
     }
   }
   return null;
