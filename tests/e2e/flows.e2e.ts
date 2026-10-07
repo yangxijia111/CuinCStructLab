@@ -42,6 +42,9 @@ async function closeApp(): Promise<void> {
 
 /** 通过 hash 路由或侧栏导航进入页面 */
 async function goto(page: Page, hash: string): Promise<void> {
+  // 等 React 应用挂载（主导航出现）再改 hash：冷启动时 evaluate 可能早于 Router
+  // 初始化，且后续按角色查找按钮会在页面未就绪时被误判为"不可用/提前退出循环
+  await page.getByRole('navigation', { name: '主导航' }).waitFor({ state: 'visible', timeout: 20_000 });
   await page.evaluate((h) => {
     window.location.hash = h;
   }, hash);

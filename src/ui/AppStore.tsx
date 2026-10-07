@@ -128,11 +128,25 @@ export function AppStoreProvider({ children }: { children: ReactNode }): React.R
             maxSectionIndex: row.maxSectionIndex,
           };
         }
-        // 合并：DB 恢复值 + 加载窗口内（>= bootAt）的内存乐观写入
+        // 合并：DB 恢复值 + 加载窗口内（>= bootAt）的内存乐观写入。
+        // progress 按语义合并（done 单调不降级、时间/次数/小节取大），
+        // 否则重启后刚 visit 的 learning 会覆盖 DB 里已完成章节的 done 终态
         setProgress((prev) => {
-          const merged = { ...p };
-          for (const [ch, cur] of Object.entries(prev)) {
-            if (cur.lastVisitAt >= bootAt) merged[Number(ch)] = cur;
+          const merged: Record<number, ChapterProgress> = { ...p };
+          for (const [chStr, cur] of Object.entries(prev)) {
+            const ch = Number(chStr);
+            const db = p[ch];
+            if (cur.lastVisitAt < bootAt) continue;
+            if (db === undefined) {
+              merged[ch] = cur;
+              continue;
+            }
+            merged[ch] = {
+              status: db.status === 'done' || cur.status === 'done' ? 'done' : db.status === 'learning' || cur.status === 'learning' ? 'learning' : 'new',
+              lastVisitAt: Math.max(db.lastVisitAt, cur.lastVisitAt),
+              visitCount: Math.max(db.visitCount, cur.visitCount),
+              maxSectionIndex: Math.max(db.maxSectionIndex, cur.maxSectionIndex),
+            };
           }
           return merged;
         });
